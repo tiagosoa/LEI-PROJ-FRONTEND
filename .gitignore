@@ -1,0 +1,32 @@
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Backend
+backend/node_modules/
+backend/.env
+backend/logs/
+backend/*.log
+
+# Frontend
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+frontend/*.log
+
+# macOS
+.DS_Store
+
+# System files
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Build outputs
+*.tgz
+*.tar.gz
