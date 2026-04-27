@@ -1,0 +1,47 @@
+@startuml
+title Vista de Sequência - Nível 1\nCriação de VS a partir de VST
+
+actor Utilizador as user
+
+participant "Frontend Web\n(Angular)" as frontend
+participant "Backend API\n(Node.js)" as backend
+participant "Servidor LDAP" as ldap
+participant "Infraestrutura de Cloud Privada\n(Scripts / Cluster)" as cloud
+
+user -> frontend : Solicita criação de VS a partir de VST
+activate frontend
+
+frontend -> backend : POST /api/vs\n(VST_ID, dados)
+activate backend
+
+backend -> ldap : Validar sessão / utilizador
+activate ldap
+ldap --> backend : OK
+deactivate ldap
+
+backend -> backend : Verificar crédito do utilizador
+
+alt Crédito suficiente
+
+    backend -> cloud : Executar ctl/create (VST, user)
+    activate cloud
+    cloud --> backend : VS criado (VS_ID)
+    deactivate cloud
+
+    backend --> frontend : Sucesso (dados do VS)
+    deactivate backend
+
+    frontend --> user : Apresenta novo VS
+    deactivate frontend
+
+else Crédito insuficiente
+
+    backend --> frontend : Erro (crédito insuficiente)
+    deactivate backend
+
+    frontend --> user : Apresenta erro
+    deactivate frontend
+
+end
+
+@enduml

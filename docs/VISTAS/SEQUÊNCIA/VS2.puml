@@ -1,0 +1,87 @@
+@startuml
+title Vista de Sequência - Nível 2\nCriação de VS a partir de VST
+
+actor Utilizador as user
+
+participant "UI\n(Angular Components)" as ui
+participant "Serviços de API\n(Angular Services)" as services
+participant "Gestão de Estado\n(Angular State)" as state
+
+participant "Controlador\n(Node.js)" as controller
+participant "Serviço\n(Node.js)" as service
+participant "Autenticação\n(Node.js)" as auth
+participant "Executor de Comandos\n(Node.js)" as executor
+
+participant "Servidor LDAP" as ldap
+participant "Infraestrutura Cloud\n(Scripts / Cluster)" as cloud
+
+user -> ui : Solicita criação de VS
+activate ui
+
+ui -> services : createVS(VST_ID, dados)
+activate services
+
+services -> controller : POST /api/vs
+activate controller
+
+controller -> service : criarVS(dados)
+activate service
+
+service -> auth : validarUtilizador()
+activate auth
+
+auth -> ldap : autenticar
+activate ldap
+ldap --> auth : OK
+deactivate ldap
+
+auth --> service : válido
+deactivate auth
+
+service -> service : verificar crédito
+
+alt Crédito suficiente
+
+    service -> executor : executar create(VST, user)
+    activate executor
+
+    executor -> cloud : ctl/create
+    activate cloud
+    cloud --> executor : VS criado (VS_ID)
+    deactivate cloud
+
+    executor --> service : resultado
+    deactivate executor
+
+    service --> controller : sucesso
+    deactivate service
+
+    controller --> services : resposta OK
+    deactivate controller
+
+    services -> state : atualizar lista VS
+    activate state
+    state --> ui : novo estado
+    deactivate state
+
+    ui --> user : Mostra novo VS
+    deactivate services
+    deactivate ui
+
+else Crédito insuficiente
+
+    service --> controller : erro
+    deactivate service
+
+    controller --> services : erro
+    deactivate controller
+
+    services --> ui : erro
+
+    ui --> user : Mostra erro
+    deactivate services
+    deactivate ui
+
+end
+
+@enduml

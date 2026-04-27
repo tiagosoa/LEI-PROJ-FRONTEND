@@ -1,0 +1,31 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+title Vista Lógica - Nível 2
+
+Person(user, "Utilizador")
+
+System_Boundary(system, "Plataforma de Gestão de Cloud Privada") {
+
+    Container(frontend, "Aplicação Web", "Angular", "Interface de utilizador que permite gerir VS/VST, visualizar estado, acessos e executar operações")
+
+    Container(api, "API Backend", "Node.js", "Expõe endpoints REST para operações sobre VS/VST e gestão de utilizadores") {
+
+        Component(auth, "Módulo de Autenticação", "Node.js", "Responsável pela autenticação de utilizadores via LDAP e gestão de sessão")
+
+        Component(executor, "Módulo de Execução de Comandos", "Node.js", "Executa scripts do sistema e interpreta os resultados")
+   }
+}
+
+System_Ext(ldap, "Servidor LDAP", "Autenticação institucional")
+
+System_Ext(cloud, "Infraestrutura de Cloud Privada", "Cluster de nós e sistema baseado em scripts")
+
+Rel(user, frontend, "Interage com", "HTTPS")
+
+Rel(frontend, api, "Consome API", "JSON/HTTP")
+
+Rel(auth, ldap, "Autentica", "LDAP")
+
+Rel(executor, cloud, "Executa scripts (start, stop, create, delete)")
+
+@enduml

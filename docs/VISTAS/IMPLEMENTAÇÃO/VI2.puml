@@ -1,0 +1,53 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Vista de Implementação - Nível 2
+
+Person(user, "Utilizador")
+
+System_Boundary(system, "Plataforma de Gestão de Cloud Privada") {
+
+    Container(frontend, "Aplicação Web", "Angular") {
+
+        Component(ui, "Componentes UI", "Angular Components", "Interface gráfica (listas de VS, detalhes, formulários)")
+
+        Component(services, "Serviços de API", "Angular Services", "Responsáveis pela comunicação com o backend")
+
+        Component(state, "Gestão de Estado", "Angular", "Gestão de estado da aplicação e dados dos VS")
+
+    }
+
+    Container(api, "API Backend", "Node.js") {
+
+        Component(controller, "Camada de Controladores", "Node.js", "Define endpoints REST e processa pedidos HTTP")
+
+        Component(service, "Camada de Serviços", "Node.js", "Implementa lógica de aplicação e regras de negócio")
+
+        Component(auth, "Módulo de Autenticação", "Node.js", "Integração com LDAP e gestão de autenticação")
+
+        Component(executor, "Executor de Comandos", "Node.js", "Executa scripts do sistema e processa resultados")
+
+    }
+}
+
+System_Ext(ldap, "Servidor LDAP", "Autenticação institucional")
+
+System_Ext(cloud, "Infraestrutura de Cloud Privada", "Sistema baseado em scripts")
+
+Rel(user, ui, "Interage com", "HTTPS")
+
+Rel(ui, services, "Utiliza")
+Rel(services, controller, "Invoca API REST", "JSON/HTTP")
+
+Rel(controller, service, "Delegação")
+
+Rel(service, auth, "Autenticação")
+Rel(auth, ldap, "LDAP")
+
+Rel(service, executor, "Executa operações")
+
+Rel(executor, cloud, "Invoca scripts")
+
+Rel(service, service, "Aplica regras de negócio")
+
+@enduml

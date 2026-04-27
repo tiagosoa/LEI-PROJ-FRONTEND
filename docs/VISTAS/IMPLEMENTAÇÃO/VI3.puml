@@ -1,0 +1,56 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Vista de Implementação - Nível 3
+
+Container_Boundary(api, "API Backend (Node.js)") {
+
+    Component(routes, "Routes", "JavaScript", "Definição de endpoints HTTP (e.g. /vs, /auth)")
+
+    Component(vsController, "VSController.js", "JavaScript", "Controlador para operações sobre VS/VST")
+
+    Component(authController, "AuthController.js", "JavaScript", "Controlador de autenticação")
+
+    Component(vsService, "vsService.js", "JavaScript", "Lógica de negócio de VS/VST")
+
+    Component(creditService, "creditService.js", "JavaScript", "Gestão de crédito dos utilizadores")
+
+    Component(authService, "authService.js", "JavaScript", "Integração com LDAP")
+
+    Component(commandExecutor, "commandExecutor.js", "JavaScript", "Execução de comandos no sistema")
+
+    Component(scriptAdapter, "scriptAdapter.js", "JavaScript", "Encapsula chamadas aos scripts ctl/*")
+
+    Component(outputParser, "outputParser.js", "JavaScript", "Conversão de output de scripts para JSON")
+
+    Component(middleware, "AuthMiddleware.js", "JavaScript", "Validação de autenticação nos pedidos")
+
+}
+
+System_Ext(ldap, "Servidor LDAP", "Autenticação institucional")
+System_Ext(cloud, "Infraestrutura de Cloud Privada", "Scripts e cluster")
+
+' Fluxo real
+
+Rel(routes, vsController, "Encaminha /vs")
+Rel(routes, authController, "Encaminha /auth")
+
+Rel(vsController, vsService, "Invoca")
+Rel(authController, authService, "Invoca")
+
+Rel(vsService, creditService, "Verifica crédito")
+Rel(vsService, authService, "Valida utilizador")
+
+Rel(vsService, scriptAdapter, "Executa operações")
+
+Rel(scriptAdapter, commandExecutor, "Executa comandos")
+Rel(commandExecutor, cloud, "Invoca scripts ctl/*")
+
+Rel(scriptAdapter, outputParser, "Processa output")
+Rel(outputParser, vsService, "Retorna dados")
+
+Rel(authService, ldap, "Autentica", "LDAP")
+
+Rel(routes, middleware, "Aplica")
+
+@enduml

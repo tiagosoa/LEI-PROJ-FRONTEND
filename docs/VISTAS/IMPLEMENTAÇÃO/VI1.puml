@@ -1,0 +1,27 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Vista de Implementação - Nível 1
+
+Person(user, "Utilizador")
+
+System_Boundary(system, "Plataforma de Gestão de Cloud Privada") {
+
+    System(frontend, "Frontend Web", "Aplicação SPA desenvolvida em Angular responsável pela interface com o utilizador")
+
+    System(backend, "Backend API", "Aplicação Node.js responsável por expor API REST e executar scripts do sistema")
+
+}
+
+System_Ext(ldap, "Servidor LDAP", "Sistema de autenticação institucional")
+System_Ext(cloud, "Infraestrutura de Cloud Privada", "Sistema baseado em scripts e cluster de nós")
+
+Rel(user, frontend, "Interage com", "Browser")
+
+Rel(frontend, backend, "Consome API REST", "HTTPS/JSON")
+
+Rel(backend, ldap, "Autentica utilizadores", "LDAP")
+
+Rel(backend, cloud, "Invoca scripts de controlo (ctl/*)", "Execução de comandos")
+
+@enduml

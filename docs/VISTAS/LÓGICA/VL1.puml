@@ -1,0 +1,18 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Vista Lógica - Nível 1
+
+Person(user, "Utilizador")
+
+System(system, "Plataforma de Gestão de Cloud Privada")
+
+System_Ext(ldap, "Servidor LDAP", "Sistema de autenticação institucional")
+System_Ext(cloud, "Infraestrutura de Cloud Privada", "Cluster de nós e sistema baseado em scripts para gestão de VS/VST")
+
+Rel(user, system, "Interage com (UI Web)")
+
+Rel(system, ldap, "Autentica utilizadores", "LDAP")
+Rel(system, cloud, "Executa operações (start, stop, create, delete)", "Scripts")
+
+@enduml

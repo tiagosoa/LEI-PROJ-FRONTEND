@@ -1,0 +1,93 @@
+@startuml
+title Modelo de Domínio
+
+class User {
+  +username : String
+  +isAdmin : Boolean
+  +credit : Integer
+}
+
+class VirtualServer {
+  +VS_ID : Integer
+  +VS_NAME : String
+  +VS_DESC : String
+  +VS_STATUS : String
+  +isRunning : Boolean
+  +VS_TYPE : Integer
+  +DTR : Integer
+}
+
+class VirtualServerTemplate {
+  +VS_ID : Integer
+  +VST_NAME : String
+  +VST_DESC : String
+  +VST_COST : Integer
+  +VST_DISABLED : Boolean
+  +VS_TYPE : Integer
+}
+
+class Node {
+  +ipAddress : String
+  +supportedTypes : String
+}
+
+class Cluster {
+  +name : String
+}
+
+class NetworkInterface {
+  +ipv4 : String
+  +ipv6 : String
+  +mac : String
+  +networkName : String
+}
+
+class CustomAccess {
+  +id : Integer
+  +description : String
+  +password : String
+  +enabled : Boolean
+  +canChangePassword : Boolean
+}
+
+class CommandExecutor {
+  +execute(command : String)
+}
+
+class Script {
+  +name : String
+  +path : String
+}
+
+'========================
+' RELAÇÕES
+'========================
+
+' User owns Virtual Servers
+User "1" --> "1" VirtualServer : "possui"
+
+' User cria VS a partir de VST
+User "1" --> "1" VirtualServerTemplate : "utiliza para criar VS"
+
+' VST gera VS
+VirtualServerTemplate "1" --> "1" VirtualServer : "origina"
+
+' VS pertence a um Node quando está ativo
+VirtualServer "1" --> "1" Node : "executa em"
+
+' Cluster contém Nodes (agregação)
+Cluster "1" --> "1..*" Node : "agrega"
+
+' VS tem múltiplas interfaces de rede (composição)
+VirtualServer "1" *-- "1..*" NetworkInterface : "possui"
+
+' VS tem múltiplos acessos (composição)
+VirtualServer "1" *-- "1..*" CustomAccess : "disponibiliza"
+
+' Backend executa scripts
+CommandExecutor "1" --> "1..*" Script : "invoca"
+
+' Script atua sobre VS
+Script "1..*" --> "1" VirtualServer : "opera sobre"
+
+@enduml

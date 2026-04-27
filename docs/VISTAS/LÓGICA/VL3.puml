@@ -1,0 +1,49 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Vista Lógica - Nível 3
+
+Container(api, "API Backend (Node.js)") {
+
+    Component(vsController, "VS Controller", "Node.js", "Expõe endpoints REST para operações sobre VS/VST")
+
+    Component(authController, "Auth Controller", "Node.js", "Responsável por pedidos de autenticação")
+
+    Component(vsService, "VS Service", "Node.js", "Implementa lógica de gestão de VS/VST")
+
+    Component(creditService, "Credit Service", "Node.js", "Responsável pela verificação e cálculo de crédito")
+
+    Component(authService, "Auth Service", "Node.js", "Integração com LDAP e validação de utilizadores")
+
+    Component(commandExecutor, "Command Executor", "Node.js", "Executa comandos no sistema operativo")
+
+    Component(scriptAdapter, "Script Adapter", "Node.js", "Encapsula chamadas aos scripts (ctl/*)")
+
+    Component(outputParser, "Output Parser", "Node.js", "Interpreta outputs dos scripts e converte para JSON")
+
+}
+
+System_Ext(ldap, "Servidor LDAP", "Autenticação institucional")
+System_Ext(cloud, "Infraestrutura de Cloud Privada", "Scripts e cluster")
+
+' Relações principais
+
+Rel(vsController, vsService, "Invoca")
+
+Rel(authController, authService, "Invoca")
+
+Rel(vsService, creditService, "Verifica crédito")
+
+Rel(vsService, authService, "Valida utilizador")
+
+Rel(vsService, scriptAdapter, "Executa operações")
+
+Rel(scriptAdapter, commandExecutor, "Executa comandos")
+
+Rel(commandExecutor, cloud, "Invoca scripts (ctl/*)")
+
+Rel(scriptAdapter, outputParser, "Processa resultados")
+
+Rel(authService, ldap, "Autentica", "LDAP")
+
+@enduml

@@ -1,0 +1,87 @@
+@startuml
+title Vista de Sequência - Nível 3 - Criar VS a partir de VST
+
+actor Utilizador
+
+participant "UI Component" as UI
+participant "API Service" as APIService
+participant "Routes" as Routes
+participant "AuthMiddleware" as Middleware
+participant "VSController" as Controller
+participant "VSService" as Service
+participant "AuthService" as AuthService
+participant "CreditService" as CreditService
+participant "ScriptAdapter" as Adapter
+participant "CommandExecutor" as Executor
+participant "OutputParser" as Parser
+participant "Cloud Infrastructure" as Cloud
+
+Utilizador -> UI : Seleciona VST e cria VS
+activate UI
+
+UI -> APIService : POST /vs (dados do VST)
+activate APIService
+
+APIService -> Routes : HTTP Request
+activate Routes
+
+Routes -> Middleware : Validar autenticação
+activate Middleware
+
+Middleware -> AuthService : Validar token/sessão
+activate AuthService
+AuthService --> Middleware : OK
+deactivate AuthService
+
+Middleware -> Controller : Encaminhar pedido
+deactivate Middleware
+
+activate Controller
+Controller -> Service : createVS(vst, user)
+activate Service
+
+Service -> AuthService : Validar utilizador
+activate AuthService
+AuthService --> Service : Utilizador válido
+deactivate AuthService
+
+Service -> CreditService : Verificar crédito disponível
+activate CreditService
+CreditService --> Service : Crédito suficiente
+deactivate CreditService
+
+Service -> Adapter : create(VST, user)
+activate Adapter
+
+Adapter -> Executor : Executar comando ctl/create
+activate Executor
+
+Executor -> Cloud : Invoca script create
+activate Cloud
+Cloud --> Executor : Output do script
+deactivate Cloud
+
+Executor --> Adapter : Resultado bruto
+deactivate Executor
+
+Adapter -> Parser : Interpretar output
+activate Parser
+Parser --> Adapter : Dados estruturados (VS criado)
+deactivate Parser
+
+Adapter --> Service : Resultado final
+deactivate Adapter
+
+Service --> Controller : VS criado com sucesso
+deactivate Service
+
+Controller --> APIService : HTTP 201 + dados do VS
+deactivate Controller
+
+APIService --> UI : Resposta JSON
+deactivate APIService
+
+UI --> Utilizador : Atualiza interface
+deactivate UI
+
+@enduml
