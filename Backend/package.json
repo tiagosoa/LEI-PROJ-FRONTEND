@@ -53,5 +53,8 @@
     "coveragePathIgnorePatterns": [
       "/node_modules/"
     ]
+  },
+  "directories": {
+    "test": "tests"
   }
 }

@@ -1,9 +1,5 @@
 # Frontend for DEI Private Cloud
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
-[![Angular](https://img.shields.io/badge/Angular-17.x-red.svg)](https://angular.io/)
-
 ## Overview
 
 This project aims to develop and deploy a **new frontend service** for the DEI Private Cloud platform, replacing the existing PHP-based solution that presents scalability issues and an outdated user interface.
