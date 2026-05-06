@@ -12,7 +12,6 @@ participant "Serviço\n(Node.js)" as service
 participant "Autenticação\n(Node.js)" as auth
 participant "Executor de Comandos\n(Node.js)" as executor
 
-participant "Servidor LDAP" as ldap
 participant "Infraestrutura Cloud\n(Scripts / Cluster)" as cloud
 
 user -> ui : Solicita criação de VS
@@ -21,22 +20,16 @@ activate ui
 ui -> services : createVS(VST_ID, dados)
 activate services
 
-services -> controller : POST /api/vs
+services -> controller : POST /api/vs (token)
 activate controller
 
-controller -> service : criarVS(dados)
-activate service
-
-service -> auth : validarUtilizador()
+controller -> auth : validarToken()
 activate auth
-
-auth -> ldap : autenticar
-activate ldap
-ldap --> auth : OK
-deactivate ldap
-
-auth --> service : válido
+auth --> controller : válido
 deactivate auth
+
+controller -> service : criarVS(dados, user)
+activate service
 
 service -> service : verificar crédito
 

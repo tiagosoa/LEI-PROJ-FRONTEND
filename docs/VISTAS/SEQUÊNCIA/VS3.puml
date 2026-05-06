@@ -40,10 +40,7 @@ activate Controller
 Controller -> Service : createVS(vst, user)
 activate Service
 
-Service -> AuthService : Validar utilizador
-activate AuthService
-AuthService --> Service : Utilizador válido
-deactivate AuthService
+Service -> Service : Validar permissões (owner/admin)
 
 Service -> CreditService : Verificar crédito disponível
 activate CreditService

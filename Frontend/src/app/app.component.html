@@ -1,0 +1,16 @@
+<div class="app-container" *ngIf="(authService.currentUser$ | async) as user; else login">
+    <div class="app-header">
+        <h1>DEI Private Cloud</h1>
+        <div class="user-info">
+            <span>Welcome, {{ user.username }}</span>
+            <button (click)="logout()">Logout</button>
+        </div>
+    </div>
+    <div class="app-content">
+        <router-outlet></router-outlet>
+    </div>
+</div>
+
+<ng-template #login>
+    <router-outlet></router-outlet>
+</ng-template>

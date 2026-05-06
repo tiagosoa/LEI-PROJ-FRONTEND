@@ -5,19 +5,15 @@ actor Utilizador as user
 
 participant "Frontend Web\n(Angular)" as frontend
 participant "Backend API\n(Node.js)" as backend
-participant "Servidor LDAP" as ldap
 participant "Infraestrutura de Cloud Privada\n(Scripts / Cluster)" as cloud
 
 user -> frontend : Solicita criação de VS a partir de VST
 activate frontend
 
-frontend -> backend : POST /api/vs\n(VST_ID, dados)
+frontend -> backend : POST /api/vs\n(VST_ID, dados, token)
 activate backend
 
-backend -> ldap : Validar sessão / utilizador
-activate ldap
-ldap --> backend : OK
-deactivate ldap
+backend -> backend : Validar token / sessão
 
 backend -> backend : Verificar crédito do utilizador
 
