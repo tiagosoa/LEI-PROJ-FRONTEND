@@ -35,10 +35,10 @@ jobs:
           echo "Waiting for VPN connection to stabilize..."
           for i in {1..30}; do
             if ping -c 1 -W 2 192.168.62.4 > /dev/null 2>&1; then
-              echo "✅ VPN connected successfully! (IP route established)"
+              echo "✅ VPN connected successfully!"
               exit 0
             fi
-            echo "Attempt $i/30: Waiting for VPN route to 192.168.62.4..."
+            echo "Attempt $i/30: Waiting for VPN route..."
             sleep 2
           done
           echo "❌ Failed to establish VPN connection"
@@ -59,33 +59,33 @@ jobs:
         run: |
           ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ${{ env.BACKEND_PATH }}"
       
-      - name: Sync backend files to server
+      - name: Create .env file locally
+        run: |
+          cat > backend/.env << EOF
+          PORT=3000
+          NODE_ENV=production
+          BASE_FOLDER=/vs_cloud
+          LDAP_URL=ldap://192.168.62.4
+          LDAP_BASE_DN=ou=users,dc=dei,dc=isep,dc=ipp,dc=pt
+          LDAP_USER_ATTR=uid
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN=8h
+          CORS_ORIGIN=https://cloud.dei.isep.ipp.pt,http://localhost:4200
+          LOG_LEVEL=info
+          EOF
+          
+          echo "✅ .env file created"
+          cat backend/.env | head -5  # Show first 5 lines for verification
+      
+      - name: Sync backend files to server (excluding sensitive files)
         run: |
           rsync -avz -e "ssh -p ${{ env.SSH_PORT }}" \
             --exclude 'node_modules' \
-            --exclude '.env' \
             --exclude '.env.local' \
             --exclude 'logs' \
             --exclude '*.log' \
             --exclude 'tests' \
             backend/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.BACKEND_PATH }}/
-      
-      - name: Create .env file from template
-        run: |
-          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
-            "cd ${{ env.BACKEND_PATH }} && \
-             cat > .env << 'EOF'
-PORT=3000
-NODE_ENV=production
-BASE_FOLDER=/vs_cloud
-LDAP_URL=ldap://192.168.62.4
-LDAP_BASE_DN=ou=users,dc=dei,dc=isep,dc=ipp,dc=pt
-LDAP_USER_ATTR=uid
-JWT_SECRET=${{ secrets.JWT_SECRET }}
-JWT_EXPIRES_IN=8h
-CORS_ORIGIN=https://cloud.dei.isep.ipp.pt,http://localhost:4200
-LOG_LEVEL=info
-EOF"
       
       - name: Install dependencies on server
         run: |
@@ -157,7 +157,7 @@ EOF"
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
       
-      - name: Deploy frontend
+      - name: Deploy frontend to Apache directory
         run: |
           ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
             "mkdir -p ${{ env.FRONTEND_PATH }}"
