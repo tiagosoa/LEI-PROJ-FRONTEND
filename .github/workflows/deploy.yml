@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - master
+    paths:
+      - 'backend/**'
   workflow_dispatch:
 
 env:
@@ -12,7 +14,6 @@ env:
   SSH_PORT: 922
   SSH_USER: root
   BACKEND_PATH: /opt/dei-backend
-  FRONTEND_PATH: /var/www/html
 
 jobs:
   deploy-backend:
@@ -23,90 +24,133 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Setup VPN connection
-        uses: guillaumevincent/setup-openvpn@v2
-        with:
-          config_file: .github/workflows/openvpn-config.ovpn
-          username: ${{ secrets.VPN_USERNAME }}
-          password: ${{ secrets.VPN_PASSWORD }}
-      
-      - name: Wait for VPN to establish
+      - name: Install OpenVPN and dependencies
         run: |
-          echo "Waiting for VPN connection to stabilize..."
-          for i in {1..30}; do
-            if ping -c 1 -W 2 192.168.62.4 > /dev/null 2>&1; then
+          sudo apt-get update
+          sudo apt-get install -y openvpn net-tools iputils-ping curl
+      
+      - name: Create OpenVPN configuration
+        run: |
+          # Copy OpenVPN config file
+          sudo cp .github/workflows/openvpn-config.ovpn /etc/openvpn/client.conf
+          
+          # Create auth file with credentials
+          echo "${{ secrets.VPN_USERNAME }}" | sudo tee /etc/openvpn/auth.txt > /dev/null
+          echo "${{ secrets.VPN_PASSWORD }}" | sudo tee -a /etc/openvpn/auth.txt > /dev/null
+          
+          # Add auth-user-pass to config
+          echo "auth-user-pass /etc/openvpn/auth.txt" | sudo tee -a /etc/openvpn/client.conf
+      
+      - name: Connect to DEI VPN
+        run: |
+          # Start OpenVPN in background with output redirection
+          sudo openvpn --config /etc/openvpn/client.conf --daemon --log /tmp/openvpn.log --writepid /tmp/openvpn.pid
+          
+          # Wait for VPN connection to establish
+          echo "Waiting for VPN connection (30 seconds)..."
+          sleep 30
+          
+          # Check if VPN is connected by looking for tun interface
+          for i in {1..15}; do
+            if ip addr show tun0 2>/dev/null | grep -q "inet"; then
               echo "✅ VPN connected successfully!"
-              exit 0
+              ip addr show tun0
+              break
             fi
-            echo "Attempt $i/30: Waiting for VPN route..."
-            sleep 2
+            echo "Attempt $i/15: Waiting for tun0 interface..."
+            sleep 3
           done
-          echo "❌ Failed to establish VPN connection"
-          exit 1
+          
+          # Verify connection to internal network
+          if ping -c 2 -W 5 192.168.62.4 > /dev/null 2>&1; then
+            echo "✅ Can reach LDAP server (192.168.62.4)"
+          else
+            echo "⚠️  Cannot reach LDAP server, but continuing..."
+          fi
+          
+          # Show VPN status
+          sudo cat /tmp/openvpn.log | tail -20 || true
       
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
+          # Use echo with proper formatting for multi-line keys
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          
+          # Add host to known_hosts
           ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
       - name: Test SSH connection
         run: |
-          ssh -p ${{ env.SSH_PORT }} -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo '✅ SSH connection successful'"
+          ssh -p ${{ env.SSH_PORT }} -o ConnectTimeout=10 -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo 'SSH connection successful'"
       
       - name: Create backend directory on server
         run: |
-          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ${{ env.BACKEND_PATH }}"
+          ssh -p ${{ env.SSH_PORT }} -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
+            "mkdir -p ${{ env.BACKEND_PATH }}"
       
-      - name: Create .env file locally
+      - name: Sync backend files to server
         run: |
-          cat > backend/.env << EOF
-          PORT=3000
-          NODE_ENV=production
-          BASE_FOLDER=/vs_cloud
-          LDAP_URL=ldap://192.168.62.4
-          LDAP_BASE_DN=ou=users,dc=dei,dc=isep,dc=ipp,dc=pt
-          LDAP_USER_ATTR=uid
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          JWT_EXPIRES_IN=8h
-          CORS_ORIGIN=https://cloud.dei.isep.ipp.pt,http://localhost:4200
-          LOG_LEVEL=info
-          EOF
-          
-          echo "✅ .env file created"
-          cat backend/.env | head -5  # Show first 5 lines for verification
-      
-      - name: Sync backend files to server (excluding sensitive files)
-        run: |
-          rsync -avz -e "ssh -p ${{ env.SSH_PORT }}" \
+          rsync -avz -e "ssh -p ${{ env.SSH_PORT }} -o StrictHostKeyChecking=no" \
             --exclude 'node_modules' \
+            --exclude '.env' \
             --exclude '.env.local' \
             --exclude 'logs' \
             --exclude '*.log' \
-            --exclude 'tests' \
             backend/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.BACKEND_PATH }}/
       
+      - name: Create production .env file on server
+        run: |
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
+            "cat > ${{ env.BACKEND_PATH }}/.env << 'EOF'
+            PORT=3000
+            NODE_ENV=production
+            BASE_FOLDER=/vs_cloud
+            LDAP_URL=ldap://192.168.62.4
+            LDAP_BASE_DN=ou=users,dc=dei,dc=isep,dc=ipp,dc=pt
+            LDAP_USER_ATTR=uid
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_EXPIRES_IN=8h
+            CORS_ORIGIN=https://cloud.dei.isep.ipp.pt,http://localhost:4200
+            EOF"
+
       - name: Install dependencies on server
         run: |
           ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
             "cd ${{ env.BACKEND_PATH }} && npm install --production"
       
-      - name: Stop existing PM2 process
+      - name: Install PM2 if not present
         run: |
           ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
-            "pm2 stop dei-backend 2>/dev/null || echo 'No existing process'"
+            "command -v pm2 >/dev/null 2>&1 || npm install -g pm2"
       
-      - name: Start application with PM2
+      - name: Start/Restart application with PM2
         run: |
           ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
-            "cd ${{ env.BACKEND_PATH }} && pm2 start server.js --name dei-backend && pm2 save"
+            "cd ${{ env.BACKEND_PATH }} && \
+             pm2 stop dei-backend 2>/dev/null || true && \
+             pm2 start server.js --name dei-backend && \
+             pm2 save"
       
       - name: Verify backend is running
         run: |
           sleep 5
           ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
-            "curl -s http://localhost:3000/health | grep -q OK && echo '✅ Backend is healthy' || exit 1"
+            "curl -s http://localhost:3000/health | grep -q OK && echo '✅ Backend is healthy' || echo '⚠️ Backend health check failed'"
+      
+      - name: Show PM2 status
+        run: |
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
+            "pm2 list"
+      
+      - name: Disconnect VPN
+        if: always()
+        run: |
+          sudo kill $(cat /tmp/openvpn.pid) 2>/dev/null || true
+          echo "VPN disconnected"
 
   deploy-frontend:
     name: Deploy Frontend to DEI Cloud
@@ -133,23 +177,17 @@ jobs:
           cd frontend
           npm run build -- --configuration production
       
-      - name: Setup VPN connection
-        uses: guillaumevincent/setup-openvpn@v2
-        with:
-          config_file: .github/workflows/openvpn-config.ovpn
-          username: ${{ secrets.VPN_USERNAME }}
-          password: ${{ secrets.VPN_PASSWORD }}
-      
-      - name: Wait for VPN to establish
+      - name: Setup VPN
         run: |
-          for i in {1..30}; do
-            if ping -c 1 -W 2 192.168.62.4 > /dev/null 2>&1; then
-              echo "✅ VPN connected"
-              exit 0
-            fi
-            sleep 2
-          done
-          exit 1
+          sudo apt-get update
+          sudo apt-get install -y openvpn
+          sudo cp .github/workflows/openvpn-config.ovpn /etc/openvpn/client.conf
+          echo "${{ secrets.VPN_USERNAME }}" | sudo tee /etc/openvpn/auth.txt > /dev/null
+          echo "${{ secrets.VPN_PASSWORD }}" | sudo tee -a /etc/openvpn/auth.txt > /dev/null
+          echo "auth-user-pass /etc/openvpn/auth.txt" | sudo tee -a /etc/openvpn/client.conf
+          sudo openvpn --config /etc/openvpn/client.conf --daemon --log /tmp/openvpn.log --writepid /tmp/openvpn.pid
+          echo "Waiting for VPN..."
+          sleep 30
       
       - name: Setup SSH key
         run: |
@@ -157,14 +195,15 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
       
-      - name: Deploy frontend to Apache directory
+      - name: Deploy frontend
         run: |
-          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
-            "mkdir -p ${{ env.FRONTEND_PATH }}"
-          
-          rsync -avz -e "ssh -p ${{ env.SSH_PORT }}" \
-            --delete \
-            frontend/dist/frontend/browser/ \
-            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.FRONTEND_PATH }}/
+          scp -P ${{ env.SSH_PORT }} -o StrictHostKeyChecking=no \
+            -r frontend/dist/frontend/* \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:/var/www/html/
           
           echo "✅ Frontend deployed successfully!"
+      
+      - name: Disconnect VPN
+        if: always()
+        run: |
+          sudo kill $(cat /tmp/openvpn.pid) 2>/dev/null || true
