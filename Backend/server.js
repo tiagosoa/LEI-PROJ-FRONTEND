@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 
 const authRoutes = require('./src/routes/authRoutes');
+const vsRoutes = require('./src/routes/vsRoutes');
 const { authenticate } = require('./src/middleware/authMiddleware');
 
 const app = express();
@@ -27,10 +28,8 @@ app.get('/health', (req, res) => {
 // Rotas de autenticação (públicas)
 app.use('/api/auth', authRoutes);
 
-// Exemplo de rota protegida (para testes - descomentar depois de ter frontend)
-// app.get('/api/protected', authenticate, (req, res) => {
-//     res.json({ message: `Hello ${req.user.username}, you are authenticated!` });
-// });
+// Rotas protegidas
+app.use('/api/vs', vsRoutes);
 
 // Error handler global
 app.use((err, req, res, next) => {
