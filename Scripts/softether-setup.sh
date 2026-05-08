@@ -1,5 +1,4 @@
 #!/bin/bash
-# Script to setup SoftEther VPN client on GitHub Actions runner
 
 set -e
 

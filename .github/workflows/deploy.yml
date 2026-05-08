@@ -6,8 +6,8 @@ on:
       - main
       - master
     paths:
-      - 'backend/**'
-      - 'scripts/**'
+      - 'Backend/**'
+      - 'Scripts/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -52,8 +52,8 @@ jobs:
       
       - name: Install SoftEther VPN Client
         run: |
-          chmod +x scripts/softether-setup.sh
-          sudo scripts/softether-setup.sh
+          chmod +x Scripts/softether-setup.sh
+          sudo Scripts/softether-setup.sh
       
       - name: Configure SoftEther VPN connection
         run: |
