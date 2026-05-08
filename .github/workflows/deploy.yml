@@ -1,160 +1,106 @@
-name: Deploy with SoftEther VPN
+name: Deploy to DEI Cloud
 
 on:
   push:
-    branches:
-      - main
-      - master
-    paths:
-      - 'Backend/**'
-  workflow_dispatch:
-
-env:
-  SSH_HOST: cloud.dei.isep.ipp.pt
-  SSH_PORT: 922
-  SSH_USER: root
-  BACKEND_PATH: /opt/dei-backend
-  VPN_HOST: deinet.dei.isep.ipp.pt
-  VPN_PORT: 443
-  VPN_HUB: DEINET
+    branches: [ main, master ]
+  workflow_dispatch: 
 
 jobs:
-  deploy-backend:
-    name: Deploy Backend to DEI Cloud
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget curl net-tools iputils-ping rsync
-      
-      - name: Install SoftEther VPN Client (pre-compiled)
-        run: |
-          sudo mkdir -p /usr/local/vpnclient
-          cd /usr/local/vpnclient
-          
-          # Download binaries
-          sudo wget -q https://github.com/SoftEtherVPN/SoftEtherVPN_Stable/releases/download/v4.42-9798-rtm/softether-vpnclient-v4.42-9798-rtm-2023.06.30-linux-x64-64bit.tar.gz
-          sudo tar -xzf softether-vpnclient-*.tar.gz
-          
-          # Find and copy binaries
-          if [ -d vpnclient ]; then
-            cd vpnclient
-          else
-            cd softether-vpnclient-*/
-          fi
-          
-          sudo cp vpnclient vpncmd /usr/local/bin/
-          sudo chmod +x /usr/local/bin/vpnclient /usr/local/bin/vpncmd
-          
-          echo "SoftEther installed"
-          ls -la /usr/local/bin/vpn*
-      
-      - name: Start VPN Client
-        run: |
-          sudo vpnclient start
-          sleep 3
-          pgrep -x "vpnclient" && echo "VPN client running" || echo "VPN client not running"
-      
-      - name: Configure VPN
-        run: |
-          # Create virtual adapter
-          echo "NicCreate vpn_dei" | sudo vpncmd localhost /CLIENT || true
-          sleep 2
-          
-          # Create account
-          echo "AccountCreate dei_vpn /SERVER:${{ env.VPN_HOST }}:${{ env.VPN_PORT }} /HUB:${{ env.VPN_HUB }} /USERNAME:${{ secrets.VPN_USERNAME }} /NICNAME:vpn_dei" | sudo vpncmd localhost /CLIENT || true
-          sleep 2
-          
-          # Set password
-          echo "AccountPasswordSet dei_vpn /PASSWORD:${{ secrets.VPN_PASSWORD }} /TYPE:standard" | sudo vpncmd localhost /CLIENT || true
-          sleep 2
-          
-          # Enable and connect
-          echo "AccountEnable dei_vpn" | sudo vpncmd localhost /CLIENT || true
-          echo "AccountConnect dei_vpn" | sudo vpncmd localhost /CLIENT || true
-          
-          echo "VPN configured"
-      
-      - name: Wait for VPN connection
-        run: |
-          echo "Waiting for VPN connection..."
-          for i in {1..30}; do
-            sleep 2
-            if ip addr show vpn_vpn_dei 2>/dev/null | grep -q "inet "; then
-              echo "VPN connected!"
-              ip addr show vpn_vpn_dei
-              break
-            fi
-            echo "Attempt $i/30..."
-          done
-      
-      - name: Add routes
-        run: |
-          sudo ip route add 192.168.62.0/24 dev vpn_vpn_dei 2>/dev/null || true
-          sudo ip route add ${{ env.SSH_HOST }}/32 dev vpn_vpn_dei 2>/dev/null || true
-          echo "Routes added"
-      
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          
-          cat > ~/.ssh/id_rsa << 'EOF'
-          ${{ secrets.SSH_PRIVATE_KEY }}
-          EOF
-          
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-      
-      - name: Test SSH
-        run: |
-          ssh -p ${{ env.SSH_PORT }} -o ConnectTimeout=10 -o StrictHostKeyChecking=no \
-            ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo 'SSH OK'"
-      
-      - name: Deploy backend
-        run: |
-          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ${{ env.BACKEND_PATH }}"
-          
-          rsync -avz -e "ssh -p ${{ env.SSH_PORT }}" \
-            --exclude 'node_modules' --exclude '.env' \
-            backend/ ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.BACKEND_PATH }}/
-          
-          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
-            "cd ${{ env.BACKEND_PATH }} && \
-             cat > .env << 'ENVEOF'
-          PORT=3000
-          NODE_ENV=production
-          BASE_FOLDER=/vs_cloud
-          LDAP_URL=ldap://192.168.62.4
-          LDAP_BASE_DN=ou=users,dc=dei,dc=isep,dc=ipp,dc=pt
-          LDAP_USER_ATTR=uid
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          JWT_EXPIRES_IN=8h
-          CORS_ORIGIN=https://cloud.dei.isep.ipp.pt
-          ENVEOF"
-          
-          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
-            "cd ${{ env.BACKEND_PATH }} && npm install --production"
-          
-          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
-            "command -v pm2 >/dev/null 2>&1 || npm install -g pm2"
-          
-          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
-            "cd ${{ env.BACKEND_PATH }} && \
-             pm2 stop dei-backend 2>/dev/null || true && \
-             pm2 start server.js --name dei-backend && \
-             pm2 save"
-          
-          echo "Deploy complete"
-      
-      - name: Disconnect VPN
-        if: always()
-        run: |
-          echo "AccountDisconnect dei_vpn" | sudo vpncmd localhost /CLIENT 2>/dev/null || true
-          sudo vpnclient stop 2>/dev/null || true
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: |
+          Backend/package-lock.json
+          Frontend/package-lock.json
+    
+    - name: Install backend dependencies
+      run: |
+        cd Backend
+        npm ci
+    
+    - name: Install frontend dependencies
+      run: |
+        cd Frontend
+        npm ci
+    
+    - name: Setup SSH agent
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+    
+    - name: Add server to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -p ${{ secrets.SERVER_PORT }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+        ssh-keyscan -p 22 ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+    
+    - name: Connect to DEI VPN
+      run: |
+        chmod +x Scripts/vpn-connect.sh
+        ./Scripts/vpn-connect.sh \
+          "${{ secrets.VPN_SERVER }}" \
+          "${{ secrets.VPN_HUB }}" \
+          "${{ secrets.VPN_USER }}" \
+          "${{ secrets.VPN_PASSWORD }}"
+    
+    - name: Test SSH connection
+      run: |
+        ssh -p ${{ secrets.SERVER_PORT }} \
+          -o ConnectTimeout=10 \
+          ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+          "echo 'SSH connection successful!'"
+    
+    - name: Deploy Backend
+      run: |
+        chmod +x Scripts/deploy-backend.sh
+        ./Scripts/deploy-backend.sh \
+          "${{ secrets.SERVER_HOST }}" \
+          "${{ secrets.SERVER_PORT }}" \
+          "${{ secrets.SERVER_USER }}" \
+          "/opt/dei-backend"
+    
+    - name: Deploy Frontend
+      run: |
+        chmod +x Scripts/deploy-frontend.sh
+        ./Scripts/deploy-frontend.sh \
+          "${{ secrets.SERVER_HOST }}" \
+          "${{ secrets.SERVER_PORT }}" \
+          "${{ secrets.SERVER_USER }}" \
+          "/var/www/dei-cloud-frontend"
+    
+    - name: Reload Apache
+      run: |
+        ssh -p ${{ secrets.SERVER_PORT }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+          "systemctl reload apache2 2>/dev/null || systemctl reload httpd 2>/dev/null || true"
+    
+    - name: Verify deployment
+      run: |
+        echo "Waiting for services to start..."
+        sleep 10
+        
+        # Testar backend
+        echo "Checking backend..."
+        curl -s -o /dev/null -w "Backend health: %{http_code}\n" \
+          https://cloud.dei.isep.ipp.pt/health || \
+          echo "Backend health check pending..."
+        
+        # Testar frontend
+        echo "Checking frontend..."
+        curl -s -o /dev/null -w "Frontend: %{http_code}\n" \
+          https://cloud.dei.isep.ipp.pt/ || \
+          echo "Frontend check pending..."
+    
+    - name: Disconnect VPN
+      if: always()
+      run: |
+        cd /tmp/vpnclient 2>/dev/null && ./vpnclient stop 2>/dev/null || true
