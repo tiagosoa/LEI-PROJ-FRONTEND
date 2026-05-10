@@ -84,8 +84,49 @@ async function getVSDetails(req, res) {
     }
 }
 
+/**
+ * GET /api/vs/:folderName/details
+ * Retorna detalhes estendidos de um VS específico (com custom accesses e rede)
+ */
+async function getVSDetailsExtended(req, res) {
+    try {
+        const { folderName } = req.params;
+        const username = req.user.username;
+        
+        // Verificar se o utilizador é owner ou admin
+        const folderInfo = vsService.parseFolderName(folderName);
+        const isOwner = folderInfo.owner === username;
+        
+        if (!isOwner && !req.user.isAdmin) {
+            return res.status(403).json({
+                success: false,
+                error: 'Access denied. You do not own this virtual server.'
+            });
+        }
+        
+        const vsDetails = await vsService.getVSDetailsExtended(folderName);
+        res.json({
+            success: true,
+            data: vsDetails
+        });
+    } catch (error) {
+        console.error('Error in getVSDetailsExtended:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to retrieve virtual server details'
+        });
+    }
+}
+
 module.exports = {
     getUserVSList,
     getAllVSList,
-    getVSDetails
+    getVSDetails,
+      // Novo método
+};
+module.exports = {
+    getUserVSList,
+    getAllVSList,
+    getVSDetails,
+    getVSDetailsExtended
 };

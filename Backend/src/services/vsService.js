@@ -127,10 +127,91 @@ async function getAllVS() {
     return vsList;
 }
 
+
+async function getCustomAccesses(vsFolder) {
+    const customAccesses = [];
+    
+    for (let i = 1; i <= 25; i++) {
+        const desc = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_DESC`);
+        if (desc && desc.trim() !== '') {
+            const password = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_PASS`);
+            const enabledDisabled = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_ENABLED_DISABLED`);
+            const passChange = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_PASS_CHANGE`);
+            
+            customAccesses.push({
+                id: i,
+                description: desc,
+                password: password || null,
+                enabled: !enabledDisabled || enabledDisabled === 'enabled',
+                canChangePassword: !!(passChange && passChange.trim() !== ''),
+                changeDescription: passChange || null
+            });
+        }
+    }
+    
+    return customAccesses;
+}
+
+async function getNetworkConfig(vsFolder) {
+    const networks = ['VNET1', 'VNET2', 'VNET3', 'VNET4'];
+    const networkConfigs = [];
+    
+    for (const net of networks) {
+        const ipv4 = await getAttribute(vsFolder, `VS_IP_${net}`);
+        const ipv6 = await getAttribute(vsFolder, `VS_IPV6_${net}`);
+        const mac = await getAttribute(vsFolder, `VS_MAC_${net}`);
+        
+        if (ipv4 || ipv6 || mac) {
+            networkConfigs.push({
+                name: net,
+                ipv4: ipv4 || null,
+                ipv6: ipv6 || null,
+                mac: mac || null
+            });
+        }
+    }
+    
+    return networkConfigs;
+}
+
+async function getVSDetailsExtended(vsFolder) {
+    const baseDetails = await getVSDetails(vsFolder);
+    
+    const additionalAttrs = [
+        'VS_TYPE_DESC', 'VS_FIXED_HOST', 'VS_PREF_HOSTS', 'VS_REQUISITES',
+        'VS_IP_VNET1', 'VS_IP_VNET2', 'VS_IP_VNET3', 'VS_IP_VNET4',
+        'VS_IPV6_VNET1', 'VS_IPV6_VNET2', 'VS_IPV6_VNET3', 'VS_IPV6_VNET4',
+        'VS_MAC_VNET1', 'VS_MAC_VNET2', 'VS_MAC_VNET3', 'VS_MAC_VNET4'
+    ];
+    
+    const attrValues = await getMultipleAttributes(vsFolder, additionalAttrs);
+
+    const customAccesses = await getCustomAccesses(vsFolder);
+    
+    const networkConfigs = await getNetworkConfig(vsFolder);
+    
+    return {
+        ...baseDetails,
+        typeDescription: attrValues.VS_TYPE_DESC || `Type ${baseDetails.type}`,
+        fixedHost: attrValues.VS_FIXED_HOST || null,
+        preferredHosts: attrValues.VS_PREF_HOSTS ? attrValues.VS_PREF_HOSTS.split(' ') : [],
+        requisites: attrValues.VS_REQUISITES ? attrValues.VS_REQUISITES.split(' ') : [],
+        networkConfigs: networkConfigs,
+        customAccesses: customAccesses,
+        ipVnet1: attrValues.VS_IP_VNET1 || null,
+        ipv6Vnet1: attrValues.VS_IPV6_VNET1 || null,
+        macVnet1: attrValues.VS_MAC_VNET1 || null
+    };
+}
+
+
 module.exports = {
     listFolders,
     getVSDetails,
     getUserVS,
     getAllVS,
-    parseFolderName
+    parseFolderName,
+    getCustomAccesses,
+    getNetworkConfig,
+    getVSDetailsExtended
 };

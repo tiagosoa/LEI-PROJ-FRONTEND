@@ -8,6 +8,7 @@ router.use(authenticate);
 
 router.get('/', vsController.getUserVSList);
 router.get('/all', vsController.getAllVSList);
+router.get('/:folderName/details', vsController.getVSDetailsExtended);
 router.get('/:folderName', vsController.getVSDetails);
 
 module.exports = router;

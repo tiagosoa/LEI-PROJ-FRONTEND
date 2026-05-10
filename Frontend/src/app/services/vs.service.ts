@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { VirtualServer, VSListResponse, VSDetailsResponse } from '../models/vs.model';
+import { VirtualServer, VSListResponse, VSDetailsResponse, VirtualServerExtended } from '../models/vs.model';
 import { environment } from '../environments/environment';
 
 @Injectable({
@@ -32,5 +32,8 @@ export class VSService {
      */
     getVSDetails(folderName: string): Observable<VSDetailsResponse> {
         return this.http.get<VSDetailsResponse>(`${this.apiUrl}/vs/${folderName}`);
+    }
+    getVSDetailsExtended(folderName: string): Observable<VSDetailsResponse> {
+    return this.http.get<VSDetailsResponse>(`${this.apiUrl}/vs/${folderName}/details`);
     }
 }
