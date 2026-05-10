@@ -6,30 +6,49 @@ const morgan = require('morgan');
 
 const authRoutes = require('./src/routes/authRoutes');
 const vsRoutes = require('./src/routes/vsRoutes');
-const { authenticate } = require('./src/middleware/authMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const corsOptions = {
+    origin: [
+        'http://localhost:4200',
+        'http://127.0.0.1:4200',
+        'http://cloud.dei.isep.ipp.pt',
+        'https://cloud.dei.isep.ipp.pt'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
 // Middleware global
-app.use(helmet());
-app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
-    credentials: true
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(morgan('combined'));
 
-// Rotas de health check (pública)
+// Para debugging - log de todos os pedidos
+app.use((req, res, next) => {
+    console.log(`📥 ${req.method} ${req.url} - Origin: ${req.headers.origin}`);
+    next();
+});
+
+// Rotas públicas
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Rotas de autenticação (públicas)
 app.use('/api/auth', authRoutes);
-
-// Rotas protegidas
 app.use('/api/vs', vsRoutes);
+
+// Rota de teste CORS (útil para debug)
+app.options('/api/test', cors(corsOptions));
+app.get('/api/test', (req, res) => {
+    res.json({ message: 'CORS test successful' });
+});
 
 // Error handler global
 app.use((err, req, res, next) => {
@@ -40,9 +59,8 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Backend API running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`LDAP URL: ${process.env.LDAP_URL}`);
+    console.log(`CORS enabled for: ${corsOptions.origin.join(', ')}`);
 });
