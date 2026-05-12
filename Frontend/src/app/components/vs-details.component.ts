@@ -1,8 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
-import { VSService } from '../../services/vs.service';
-import { VirtualServerExtended, CustomAccess } from '../../models/vs.model';
+import { VSService } from '../services/vs.service';
+import { VirtualServer, CustomAccess } from '../models/vs.model';
 
 @Component({
     selector: 'app-vs-details',
@@ -11,17 +11,17 @@ import { VirtualServerExtended, CustomAccess } from '../../models/vs.model';
     template: `
         <div class="details-container" *ngIf="!isLoading && vs; else loading">
             <div class="details-header">
-                <button class="back-btn" (click)="goBack()">← Back to VS List</button>
+                <button class="back-btn" (click)="goBack()">Back to VS List</button>
                 <h1>{{ vs.name || 'Virtual Server' }}</h1>
                 <div class="action-buttons">
                     <button class="action-btn start" [disabled]="vs.softStatus === 'running'" (click)="startVS()">
-                        ▶ Start
+                        Start
                     </button>
                     <button class="action-btn stop" [disabled]="vs.softStatus !== 'running'" (click)="stopVS()">
-                        ■ Stop
+                        Stop
                     </button>
                     <button class="action-btn delete" [disabled]="vs.softStatus === 'running'" (click)="deleteVS()">
-                        🗑 Delete
+                        Delete
                     </button>
                 </div>
             </div>
@@ -133,7 +133,7 @@ import { VirtualServerExtended, CustomAccess } from '../../models/vs.model';
                         </div>
                         <div class="access-action" *ngIf="access.canChangePassword">
                             <button class="change-pass-btn" (click)="changePassword(access.id)">
-                                🔑 {{ access.changeDescription || 'Change Password' }}
+                                 {{ access.changeDescription || 'Change Password' }}
                             </button>
                         </div>
                     </div>
@@ -294,8 +294,9 @@ import { VirtualServerExtended, CustomAccess } from '../../models/vs.model';
             line-height: 1.6;
             margin: 0;
             white-space: pre-wrap;
+            text-align: justify;
         }
-        
+
         .network-table {
             display: flex;
             flex-direction: column;
@@ -482,35 +483,56 @@ import { VirtualServerExtended, CustomAccess } from '../../models/vs.model';
     `]
 })
 export class VSDetailsComponent implements OnInit {
-    vs: VirtualServerExtended | null = null;
+    vs: VirtualServer | null = null;
     isLoading = true;
+    errorMessage: string = '';
     showPassword: { [key: number]: boolean } = {};
     
     constructor(
         private route: ActivatedRoute,
         private router: Router,
-        private vsService: VSService
+        private vsService: VSService,
+        private cdr: ChangeDetectorRef
     ) {}
     
     ngOnInit(): void {
+        console.log('VSDetailsComponent initialized');
         this.route.params.subscribe(params => {
             const folderName = params['folderName'];
+            console.log('Folder name from route:', folderName);
             if (folderName) {
                 this.loadVSDetails(folderName);
+            } else {
+                console.error('No folderName in route params');
+                this.errorMessage = 'No virtual server specified';
+                this.isLoading = false;
+                this.cdr.detectChanges();
             }
         });
     }
     
     loadVSDetails(folderName: string): void {
+        console.log('Loading VS details for:', folderName);
         this.isLoading = true;
-        this.vsService.getVSDetailsExtended(folderName).subscribe({
+        this.cdr.detectChanges();
+        
+        this.vsService.getVSDetails(folderName).subscribe({
             next: (response) => {
-                this.vs = response.data;
+                console.log('VS details response:', response);
+                if (response.success && response.data) {
+                    this.vs = response.data;
+                    console.log('VS details loaded:', this.vs);
+                } else {
+                    this.errorMessage = 'Failed to load virtual server details';
+                }
                 this.isLoading = false;
+                this.cdr.detectChanges();
             },
             error: (error) => {
                 console.error('Error loading VS details:', error);
+                this.errorMessage = `Error: ${error.message || 'Failed to load details'}`;
                 this.isLoading = false;
+                this.cdr.detectChanges();
             }
         });
     }
@@ -538,7 +560,6 @@ export class VSDetailsComponent implements OnInit {
     
     togglePassword(accessId: number, inputElement: HTMLInputElement): void {
         this.showPassword[accessId] = !this.showPassword[accessId];
-        // Pequeno delay para o input atualizar o tipo
         setTimeout(() => {
             inputElement.type = this.showPassword[accessId] ? 'text' : 'password';
         }, 0);
@@ -546,7 +567,7 @@ export class VSDetailsComponent implements OnInit {
     
     copyPassword(password: string): void {
         navigator.clipboard.writeText(password);
-        // TODO: Mostrar notificação de sucesso
+        alert('Password copied to clipboard!');
     }
     
     changePassword(accessId: number): void {

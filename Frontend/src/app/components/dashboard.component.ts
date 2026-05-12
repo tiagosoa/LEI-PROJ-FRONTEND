@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
+import { AuthService } from '../services/auth.service';
 
 @Component({
     selector: 'app-dashboard',
@@ -10,7 +10,7 @@ import { AuthService } from '../../services/auth.service';
     template: `
         <div class="dashboard-container">
             <h2>Dashboard</h2>
-            <p>Bem-vindo à Private Cloud do DEI, {{ username }}!</p>
+            <p>Welcome to the DEI Private Cloud, {{ username }}!</p>
             
             <div class="quick-actions">
                 <div class="action-card" routerLink="/vs">

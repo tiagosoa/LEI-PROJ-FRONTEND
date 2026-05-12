@@ -13,6 +13,16 @@ export interface VirtualServer {
     dtr: number;
     disabled?: boolean;
     folderName: string;
+    typeDescription?: string;
+    vstName?: string;
+    fixedHost: string | null;
+    preferredHosts: string[];
+    requisites: string[];
+    networkConfigs: NetworkConfig[];
+    customAccesses: CustomAccess[];
+    ipVnet1: string | null;
+    ipv6Vnet1: string | null;
+    macVnet1: string | null;
 }
 
 export interface NetworkConfig {
@@ -31,18 +41,6 @@ export interface CustomAccess {
     changeDescription: string | null;
 }
 
-export interface VirtualServerExtended extends VirtualServer {
-    typeDescription: string;
-    fixedHost: string | null;
-    preferredHosts: string[];
-    requisites: string[];
-    networkConfigs: NetworkConfig[];
-    customAccesses: CustomAccess[];
-    ipVnet1: string | null;
-    ipv6Vnet1: string | null;
-    macVnet1: string | null;
-}
-
 export interface VSListResponse {
     success: boolean;
     data: VirtualServer[];
@@ -50,5 +48,5 @@ export interface VSListResponse {
 
 export interface VSDetailsResponse {
     success: boolean;
-    data: VirtualServerExtended;  
+    data: VirtualServer;  
 }

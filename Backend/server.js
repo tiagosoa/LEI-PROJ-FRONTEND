@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const path = require('path');
+const fs = require('fs');
 
 const authRoutes = require('./src/routes/authRoutes');
 const vsRoutes = require('./src/routes/vsRoutes');
@@ -24,7 +26,8 @@ const corsOptions = {
 
 // Middleware global
 app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false  
 }));
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -58,6 +61,20 @@ app.use((err, req, res, next) => {
         error: 'Internal server error'
     });
 });
+
+const frontendPath = '/var/www/html';
+
+if (fs.existsSync(frontendPath)) {
+    console.log(`📁 Serving frontend from: ${frontendPath}`);
+    app.use(express.static(frontendPath));
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api')) return next();
+        res.sendFile(path.join(frontendPath, 'index.html'));
+    });
+} else {
+    console.log(`Frontend path not found: ${frontendPath}`);
+    console.log('API only mode - frontend not being served');
+}
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Backend API running on port ${PORT}`);

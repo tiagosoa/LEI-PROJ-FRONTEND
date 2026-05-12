@@ -1,4 +1,3 @@
-import { Injectable } from '@angular/core';
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
@@ -8,20 +7,24 @@ import { catchError, throwError } from 'rxjs';
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const authService = inject(AuthService);
     const router = inject(Router);
-    
     const token = authService.getToken();
     
+    let authReq = req;
     if (token) {
-        req = req.clone({
+        authReq = req.clone({
             setHeaders: {
                 Authorization: `Bearer ${token}`
             }
         });
+        console.log('🔐 Token added to request:', req.url);
+    } else {
+        console.log('⚠️ No token for request:', req.url);
     }
     
-    return next(req).pipe(
+    return next(authReq).pipe(
         catchError((error: HttpErrorResponse) => {
             if (error.status === 401) {
+                console.log('🔒 Token expired or invalid, logging out...');
                 authService.logout();
                 router.navigate(['/login']);
             }

@@ -26,40 +26,38 @@ import { AuthService } from './services/auth.service';
         </ng-template>
     `,
     styles: [`
-    .app-header {
-        background: #4a5568;  /* Cinzento escuro em vez de gradiente roxo */
-        color: white;
-        padding: 15px 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .app-header h1 {
-        margin: 0;
-        font-size: 1.5rem;
-    }
-    .user-info {
-        display: flex;
-        gap: 15px;
-        align-items: center;
-    }
-    .user-info button {
-        background: rgba(255,255,255,0.2);
-        border: none;
-        color: white;
-        padding: 5px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    .user-info button:hover {
-        background: rgba(255,255,255,0.3);
-    }
-    .app-content {
-        background: #e0e0e0;  /* Fundo cinzento para o conteúdo */
-        min-height: calc(100vh - 60px);
-        padding: 20px;
-    }
-`]
+        .app-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .app-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        .user-info {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .user-info button {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .user-info button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .app-content {
+            padding: 20px;
+        }
+    `]
 })
 export class AppComponent {
     constructor(public authService: AuthService) {}
