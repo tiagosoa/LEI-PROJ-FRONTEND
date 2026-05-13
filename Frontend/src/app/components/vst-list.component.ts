@@ -1,8 +1,10 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { VSTService } from '../services/vst.service';
 import { VirtualServerTemplate } from '../models/vst.model';
+import { CreditService } from '../services/credit.service';
+import { VSService } from '../services/vs.service';
 
 @Component({
     selector: 'app-vst-list',
@@ -52,11 +54,11 @@ import { VirtualServerTemplate } from '../models/vst.model';
                     </div>
                     
                     <div class="vst-card-footer">
-                        <button class="description-btn" (click)="openDescriptionModal(vst)">
+                        <button class="description-btn" (click)="openDescriptionModal(vst)" [disabled]="isLoading">
                             View Description
                         </button>
-                        <button class="create-btn" (click)="createVS(vst)">
-                            Create Virtual Server from this template
+                        <button class="create-btn" (click)="createVS(vst)" [disabled]="creatingVS">
+                            {{ creatingVS ? 'Creating...' : 'Create Virtual Server from this template' }}
                         </button>
                     </div>
                 </div>
@@ -398,10 +400,14 @@ export class VSTListComponent implements OnInit {
     vstList: VirtualServerTemplate[] = [];
     isLoading = true;
     selectedVST: VirtualServerTemplate | null = null;
+    creatingVS: boolean = false;
     
     constructor(
-        private vstService: VSTService,
-        private cdr: ChangeDetectorRef
+    private vstService: VSTService,
+    private vsService: VSService,
+    private creditService: CreditService,
+    private router: Router,
+    private cdr: ChangeDetectorRef
     ) {}
     
     ngOnInit(): void {
@@ -441,9 +447,35 @@ export class VSTListComponent implements OnInit {
         this.selectedVST = null;
         this.cdr.detectChanges();
     }
-    
+
+
     createVS(vst: VirtualServerTemplate): void {
-        console.log('Create VS from template:', vst.folderName);
-        // TODO: Implementar na US5
+    if (confirm(`Create a new virtual server from template "${vst.name}"?`)) {
+        this.creatingVS = true;
+        this.cdr.detectChanges();
+        
+        this.vsService.createVS(vst.folderName).subscribe({
+            next: (response) => {
+                if (response.success) {
+                    alert(`Virtual server created successfully!`);
+                    this.creditService.refreshCredit();
+                    this.router.navigate(['/vs']);
+                }
+                this.creatingVS = false;
+                this.cdr.detectChanges();
+            },
+            error: (error) => {
+                console.error('Error creating VS:', error);
+                if (error.status === 403 && error.error?.error === 'Insufficient credit') {
+                    const credit = error.error?.credit;
+                    alert(`Insufficient credit! You need ${vst.cost} credits but only have ${credit?.available || 0} available.`);
+                } else {
+                    alert(`Failed to create virtual server: ${error.error?.error || 'Unknown error'}`);
+                }
+                this.creatingVS = false;
+                this.cdr.detectChanges();
+            }
+        });
+    }
     }
 }

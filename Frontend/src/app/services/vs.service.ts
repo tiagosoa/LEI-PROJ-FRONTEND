@@ -32,4 +32,12 @@ export class VSService {
     getVSDetails(folderName: string): Observable<VSDetailsResponse> {
         return this.http.get<VSDetailsResponse>(`${this.apiUrl}/vs/${folderName}`);
     }
+
+    /**
+     * Cria um novo VS a partir de um template
+     * @param vstFolderName - Nome da pasta do template (ex: VST_7_admin_100)
+     */
+    createVS(vstFolderName: string): Observable<any> {
+        return this.http.post(`${this.apiUrl}/vs/create`, { vstFolderName });
+    }
 }

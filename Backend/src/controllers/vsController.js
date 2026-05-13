@@ -145,18 +145,14 @@ async function createVS(req, res) {
             });
         }
         
-        // Executar comando create
-        const command = `/ctl/create ${vstFolderName} ${username}`;
-        const output = await runLocalCommand(command);
-        
-        // Parse do output para obter o nome da pasta do novo VS
-        // O script create normalmente retorna o nome da pasta criada
-        const newVSFolder = output.trim();
+        // Criar VS (a lógica está no service)
+        const result = await vsService.createVS(vstFolderName, username);
         
         res.json({
             success: true,
             data: {
-                folderName: newVSFolder,
+                folderName: result.folderName,
+                vs: result.vs,
                 message: 'Virtual server created successfully'
             }
         });
@@ -174,6 +170,6 @@ module.exports = {
     getUserVSList,
     getAllVSList,
     getVSDetails,
-    getUserCredit,  // NOVO
-    createVS         // NOVO
+    getUserCredit,
+    createVS         
 };

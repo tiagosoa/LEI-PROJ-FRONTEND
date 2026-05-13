@@ -161,7 +161,6 @@ async function getVSDetails(vsFolder, extended = false) {
     const typeNumber = parseInt(folderInfo.type);
     let typeDescription = await getTypeDescription(typeNumber);
     
-    // Estrutura base do VS
     const vsDetails = {
         id: folderInfo.id,
         type: typeNumber,
@@ -178,7 +177,6 @@ async function getVSDetails(vsFolder, extended = false) {
         disabled: isVST ? attrValues.VST_DISABLED === 'YES' : false,
         folderName: vsFolder,
         typeDescription: typeDescription,
-        // Campos para extended details (preenchidos abaixo se necessário)
         fixedHost: null,
         preferredHosts: [],
         requisites: [],
@@ -283,11 +281,71 @@ async function getVSTDetails(vstFolder) {
     };
 }
 
-// Adicionar ao module.exports
-module.exports = {
-    // ... exports existentes ...
-    getVSTDetails  // NOVO
-};
+/**
+ * Cria um novo VS a partir de um template
+ * @param {string} vstFolderName - Nome da pasta do template (ex: VST_2_sys_2)
+ * @param {string} username - Nome do utilizador dono do novo VS
+ * @returns {Promise<Object>} - Informação do VS criado
+ */
+async function createVS(vstFolderName, username) {
+    try {
+        // Verificar se o template existe
+        const vstDetails = await getVSTDetails(vstFolderName);
+        
+        if (!vstDetails) {
+            throw new Error(`Template ${vstFolderName} not found`);
+        }
+        
+        if (vstDetails.disabled) {
+            throw new Error(`Template ${vstFolderName} is disabled`);
+        }
+        
+        // Obter lista de VS antes da criação
+        const beforeVSList = await getUserVS(username);
+        const beforeFolderNames = new Set(beforeVSList.map(vs => vs.folderName));
+        
+        // Executar comando create
+        const command = `/ctl/create ${vstFolderName} ${username}`;
+        console.log(`Executing: ${command}`);
+        const output = await runLocalCommand(command);
+        console.log(`Create command output: "${output}"`);
+        
+        // Obter lista de VS depois da criação
+        const afterVSList = await getUserVS(username);
+        
+        // Encontrar o VS que foi adicionado
+        const newVS = afterVSList.find(vs => !beforeFolderNames.has(vs.folderName));
+        
+        if (!newVS) {
+            // Se não encontrou diferença, tentar obter o VS mais recente
+            // Ordenar por ID (assumindo que IDs maiores são mais recentes)
+            const sortedVS = [...afterVSList].sort((a, b) => parseInt(b.id) - parseInt(a.id));
+            const newestVS = sortedVS[0];
+            
+            if (newestVS && !beforeFolderNames.has(newestVS.folderName)) {
+                return {
+                    success: true,
+                    folderName: newestVS.folderName,
+                    vs: newestVS
+                };
+            }
+            
+            throw new Error(`Could not find newly created VS. Before: ${beforeVSList.length}, After: ${afterVSList.length}`);
+        }
+        
+        const vsDetails = await getVSDetails(newVS.folderName, true);
+        
+        return {
+            success: true,
+            folderName: newVS.folderName,
+            vs: vsDetails
+        };
+        
+    } catch (error) {
+        console.error(`Error creating VS from ${vstFolderName} for ${username}:`, error);
+        throw error;
+    }
+}
 
 module.exports = {
     listFolders,
@@ -297,5 +355,7 @@ module.exports = {
     parseFolderName,
     getCustomAccesses,
     getNetworkConfig,
-    getTypeDescription
+    getVSTDetails,
+    getTypeDescription,
+    createVS
 };
