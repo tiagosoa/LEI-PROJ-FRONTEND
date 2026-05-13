@@ -1,4 +1,5 @@
 const vsService = require('../services/vsService');
+const creditService = require('../services/creditService');
 
 /**
  * GET /api/vs
@@ -84,8 +85,95 @@ async function getVSDetails(req, res) {
     }
 }
 
+/**
+ * GET /api/vs/credit
+ * Retorna o crédito do utilizador autenticado
+ */
+async function getUserCredit(req, res) {
+    try {
+        const username = req.user.username;
+        const credit = await creditService.getAvailableCredit(username);
+        
+        res.json({
+            success: true,
+            data: credit
+        });
+    } catch (error) {
+        console.error('Error in getUserCredit:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to retrieve credit information'
+        });
+    }
+}
+
+/**
+ * POST /api/vs/create
+ * Cria um novo VS a partir de um template
+ */
+async function createVS(req, res) {
+    try {
+        const { vstFolderName } = req.body;
+        const username = req.user.username;
+        
+        if (!vstFolderName) {
+            return res.status(400).json({
+                success: false,
+                error: 'Template folder name is required'
+            });
+        }
+        
+        // Obter detalhes do VST para verificar custo
+        const vstDetails = await vsService.getVSTDetails(vstFolderName);
+        
+        if (!vstDetails) {
+            return res.status(404).json({
+                success: false,
+                error: 'Template not found'
+            });
+        }
+        
+        // Verificar crédito suficiente
+        const hasCredit = await creditService.hasSufficientCredit(username, vstDetails.cost);
+        
+        if (!hasCredit) {
+            const credit = await creditService.getAvailableCredit(username);
+            return res.status(403).json({
+                success: false,
+                error: 'Insufficient credit',
+                credit: credit
+            });
+        }
+        
+        // Executar comando create
+        const command = `/ctl/create ${vstFolderName} ${username}`;
+        const output = await runLocalCommand(command);
+        
+        // Parse do output para obter o nome da pasta do novo VS
+        // O script create normalmente retorna o nome da pasta criada
+        const newVSFolder = output.trim();
+        
+        res.json({
+            success: true,
+            data: {
+                folderName: newVSFolder,
+                message: 'Virtual server created successfully'
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error in createVS:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create virtual server: ' + error.message
+        });
+    }
+}
+
 module.exports = {
     getUserVSList,
     getAllVSList,
-    getVSDetails
+    getVSDetails,
+    getUserCredit,  // NOVO
+    createVS         // NOVO
 };

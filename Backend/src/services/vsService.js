@@ -260,6 +260,35 @@ async function getAllVS(extended = false) {
     return vsList;
 }
 
+/**
+ * Obtém detalhes de um VST (necessário para verificar custo)
+ */
+async function getVSTDetails(vstFolder) {
+    const parts = vstFolder.split('_');
+    const type = parseInt(parts[1]);
+    const owner = parts[2];
+    const id = parts[3];
+    
+    const attributes = ['VST_NAME', 'VST_COST', 'VST_DISABLED'];
+    const attrValues = await getMultipleAttributes(vstFolder, attributes);
+    
+    return {
+        id: id,
+        type: type,
+        owner: owner,
+        name: attrValues.VST_NAME || `Template ${id}`,
+        cost: parseInt(attrValues.VST_COST) || 0,
+        disabled: attrValues.VST_DISABLED === 'YES',
+        folderName: vstFolder
+    };
+}
+
+// Adicionar ao module.exports
+module.exports = {
+    // ... exports existentes ...
+    getVSTDetails  // NOVO
+};
+
 module.exports = {
     listFolders,
     getVSDetails,

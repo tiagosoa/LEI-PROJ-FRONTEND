@@ -16,9 +16,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
                 Authorization: `Bearer ${token}`
             }
         });
-        console.log('🔐 Token added to request:', req.url);
+        console.log('Token added to request:', req.url);
     } else {
-        console.log('⚠️ No token for request:', req.url);
+        console.log('No token for request:', req.url);
     }
     
     return next(authReq).pipe(
