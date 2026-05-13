@@ -158,327 +158,358 @@ import { VirtualServer, CustomAccess } from '../models/vs.model';
             </div>
         </ng-template>
     `,
-    styles: [`
-        .details-container {
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .details-header {
-            margin-bottom: 24px;
-        }
-        
-        .back-btn {
-            background: none;
-            border: none;
-            color: #667eea;
-            cursor: pointer;
-            font-size: 14px;
-            margin-bottom: 16px;
-            padding: 0;
-        }
-        
-        .back-btn:hover {
-            text-decoration: underline;
-        }
-        
-        .details-header h1 {
-            margin: 0 0 16px 0;
-            color: #333;
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        
-        .action-btn {
-            padding: 8px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        
-        .action-btn.start {
-            background: #28a745;
-            color: white;
-        }
-        
-        .action-btn.start:hover:not(:disabled) {
-            background: #218838;
-        }
-        
-        .action-btn.stop {
-            background: #ffc107;
-            color: #333;
-        }
-        
-        .action-btn.stop:hover:not(:disabled) {
-            background: #e0a800;
-        }
-        
-        .action-btn.delete {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .action-btn.delete:hover:not(:disabled) {
-            background: #c82333;
-        }
-        
-        .action-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .info-card {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .info-card h3 {
-            margin: 0 0 16px 0;
-            color: #333;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 8px;
-        }
-        
-        .status-grid, .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 12px;
-        }
-        
-        .status-item, .info-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #e9ecef;
-        }
-        
-        .label {
-            font-weight: 500;
-            color: #666;
-        }
-        
-        .value {
-            color: #333;
-        }
-        
-        .value.running {
-            color: #28a745;
-            font-weight: bold;
-        }
-        
-        .value.low {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        
-        .note {
-            font-size: 0.8rem;
-            color: #666;
-            margin-left: 8px;
-        }
-        
-        .description {
-            color: #555;
-            line-height: 1.6;
-            margin: 0;
-            white-space: pre-wrap;
-            text-align: justify;
-        }
+    // Adiciona/modifica estas classes nos styles do componente:
 
-        .network-table {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .network-header, .network-row {
-            display: grid;
-            grid-template-columns: 100px 1fr 1fr 1fr;
-            gap: 12px;
-            padding: 10px;
-        }
-        
-        .network-header {
-            background: #f8f9fa;
-            font-weight: 500;
-            border-radius: 4px;
-        }
-        
-        .network-row {
-            border-bottom: 1px solid #e9ecef;
-        }
-        
-        .network-row:last-child {
-            border-bottom: none;
-        }
-        
-        .access-list {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        .access-item {
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
+styles: [`
+    .details-container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .details-header {
+        margin-bottom: 24px;
+    }
+    
+    .back-btn {
+        background: none;
+        border: none;
+        color: #667eea;
+        cursor: pointer;
+        font-size: 14px;
+        margin-bottom: 16px;
+        padding: 0;
+    }
+    
+    .back-btn:hover {
+        text-decoration: underline;
+    }
+    
+    .details-header h1 {
+        margin: 0 0 16px 0;
+        color: #333;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    
+    .action-btn {
+        padding: 8px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    
+    .action-btn.start {
+        background: #28a745;
+        color: white;
+    }
+    
+    .action-btn.start:hover:not(:disabled) {
+        background: #218838;
+    }
+    
+    .action-btn.stop {
+        background: #ffc107;
+        color: #333;
+    }
+    
+    .action-btn.stop:hover:not(:disabled) {
+        background: #e0a800;
+    }
+    
+    .action-btn.delete {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .action-btn.delete:hover:not(:disabled) {
+        background: #c82333;
+    }
+    
+    .action-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .info-card {
+        background: white;
+        border-radius: 8px;
+        border: 1px solid #333; 
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: border-color 0.2s;
+    }
+    
+    .info-card:hover {
+        border-color: #626161;
+    }
+    
+    .info-card h3 {
+        margin: 0 0 16px 0;
+        color: #333;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 8px;
+    }
+    
+    /* Sub-blocks dentro dos cards também com borders */
+    .status-grid, .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+    }
+    
+    .status-item, .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #333;
+    }
+    
+    .status-item:last-child, .info-row:last-child {
+        border-bottom: none;
+    }
+    
+    .network-table {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #333; 
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .network-header, .network-row {
+        display: grid;
+        grid-template-columns: 100px 1fr 1fr 1fr;
+        gap: 12px;
+        padding: 10px;
+    }
+    
+    .network-header {
+        background: #c7c8c9;
+        font-weight: 500;
+        border-bottom: 1px solid #333;
+    }
+    
+    .network-row {
+        border-bottom: 1px solid #333;
+    }
+    
+    .network-row:last-child {
+        border-bottom: none;
+    }
+    
+    /* Access items com borders */
+    .access-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .access-item {
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 16px;
+        transition: border-color 0.2s;
+    }
+    
+    .access-item:hover {
+        border-color: #444;
+    }
+    
+    .access-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #333;
+    }
+    
+    .access-title {
+        font-weight: 500;
+        color: #333;
+    }
+    
+    .access-status {
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+    }
+    
+    .access-status.enabled {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .access-status.disabled {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .access-description {
+        color: #555;
+        margin-bottom: 12px;
+        font-size: 0.9rem;
+    }
+    
+    .access-description ::ng-deep a {
+        color: #667eea;
+        text-decoration: none;
+    }
+    
+    .access-description ::ng-deep a:hover {
+        text-decoration: underline;
+    }
+    
+    .password-field {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: 8px;
+        padding: 8px;
+        border: 1px solid #333;
+        border-radius: 4px;
+        background: #f9f9f9;
+    }
+    
+    .password-field input {
+        flex: 1;
+        padding: 6px 10px;
+        border: 1px solid #444;
+        border-radius: 4px;
+        background: #f8f9fa;
+        font-family: monospace;
+    }
+    
+    .password-field button {
+        padding: 6px 12px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .password-field button:hover {
+        background: #5a67d8;
+    }
+    
+    .change-pass-btn {
+        margin-top: 12px;
+        padding: 6px 12px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .change-pass-btn:hover {
+        background: #5a6268;
+    }
+    
+    .requisites-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .requisite-tag {
+        background: #e9ecef;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 0.8rem;
+        color: #495057;
+        border: 1px solid #333; 
+    }
+    
+    .label {
+        font-weight: 500;
+        color: #666;
+    }
+    
+    .value {
+        color: #333;
+    }
+    
+    .value.running {
+        color: #28a745;
+        font-weight: bold;
+    }
+    
+    .value.low {
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    .note {
+        font-size: 0.8rem;
+        color: #666;
+        margin-left: 8px;
+    }
+    
+    .description {
+        color: #555;
+        line-height: 1.6;
+        margin: 0;
+        white-space: pre-wrap;
+        padding: 12px;
+        border: 1px solid #333;
+        border-radius: 8px;
+        background: #fafafa62;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 50px;
+    }
+    
+    .spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    @media (max-width: 768px) {
+        .details-container {
             padding: 16px;
         }
         
-        .access-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        
-        .access-title {
-            font-weight: 500;
-            color: #333;
-        }
-        
-        .access-status {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-        }
-        
-        .access-status.enabled {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .access-status.disabled {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .access-description {
-            color: #555;
-            margin-bottom: 12px;
-            font-size: 0.9rem;
-        }
-        
-        .access-description ::ng-deep a {
-            color: #667eea;
-            text-decoration: none;
-        }
-        
-        .access-description ::ng-deep a:hover {
-            text-decoration: underline;
-        }
-        
-        .password-field {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            margin-top: 8px;
-        }
-        
-        .password-field input {
-            flex: 1;
-            padding: 6px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: #f8f9fa;
-            font-family: monospace;
-        }
-        
-        .password-field button {
-            padding: 6px 12px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        
-        .password-field button:hover {
-            background: #5a67d8;
-        }
-        
-        .change-pass-btn {
-            margin-top: 12px;
-            padding: 6px 12px;
-            background: #6c757d;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        
-        .change-pass-btn:hover {
-            background: #5a6268;
-        }
-        
-        .requisites-list {
-            display: flex;
-            flex-wrap: wrap;
+        .network-header, .network-row {
+            grid-template-columns: 80px 1fr;
             gap: 8px;
         }
         
-        .requisite-tag {
-            background: #e9ecef;
-            padding: 4px 12px;
-            border-radius: 16px;
-            font-size: 0.8rem;
-            color: #495057;
+        .network-header span:nth-child(3),
+        .network-header span:nth-child(4),
+        .network-row span:nth-child(3),
+        .network-row span:nth-child(4) {
+            display: none;
         }
         
-        .loading {
-            text-align: center;
-            padding: 50px;
+        .status-grid, .info-grid {
+            grid-template-columns: 1fr;
         }
         
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+        .action-buttons {
+            justify-content: center;
         }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @media (max-width: 768px) {
-            .details-container {
-                padding: 16px;
-            }
-            
-            .network-header, .network-row {
-                grid-template-columns: 80px 1fr;
-                gap: 8px;
-            }
-            
-            .network-header span:nth-child(3),
-            .network-header span:nth-child(4),
-            .network-row span:nth-child(3),
-            .network-row span:nth-child(4) {
-                display: none;
-            }
-            
-            .status-grid, .info-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .action-buttons {
-                justify-content: center;
-            }
         }
     `]
 })

@@ -27,7 +27,7 @@ import { AuthService } from './services/auth.service';
     `,
     styles: [`
         .app-header {
-            background: #2c3e50;
+            background: #1c2732;
             color: white;
             padding: 15px 20px;
             display: flex;

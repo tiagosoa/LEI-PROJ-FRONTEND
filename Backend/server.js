@@ -8,6 +8,7 @@ const fs = require('fs');
 
 const authRoutes = require('./src/routes/authRoutes');
 const vsRoutes = require('./src/routes/vsRoutes');
+const vstRoutes = require('./src/routes/vstRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,6 +47,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/vs', vsRoutes);
+app.use('/api/vst', vstRoutes);
 
 // Rota de teste CORS (útil para debug)
 app.options('/api/test', cors(corsOptions));

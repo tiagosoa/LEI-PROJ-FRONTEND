@@ -48,6 +48,7 @@ import { AuthService } from '../services/auth.service';
         
         .action-card {
             background: white;
+            border: 3px solid #333;
             border-radius: 8px;
             padding: 30px;
             width: 250px;
