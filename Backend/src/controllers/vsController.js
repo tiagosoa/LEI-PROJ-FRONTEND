@@ -144,8 +144,6 @@ async function createVS(req, res) {
                 credit: credit
             });
         }
-        
-        // Criar VS (a lógica está no service)
         const result = await vsService.createVS(vstFolderName, username);
         
         res.json({
@@ -166,10 +164,127 @@ async function createVS(req, res) {
     }
 }
 
+/**
+ * POST /api/vs/:folderName/start
+ * Inicia um VS
+ */
+async function startVS(req, res) {
+    try {
+        const { folderName } = req.params;
+        const username = req.user.username;
+        
+        const result = await vsService.startVS(folderName, username);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Virtual server started successfully'
+        });
+        
+    } catch (error) {
+        console.error('Error in startVS:', error);
+        
+        let statusCode = 500;
+        let errorMessage = error.message;
+        
+        if (error.message.includes('not found')) {
+            statusCode = 404;
+        } else if (error.message.includes('Access denied')) {
+            statusCode = 403;
+        } else if (error.message.includes('Cannot start')) {
+            statusCode = 400;
+        }
+        
+        res.status(statusCode).json({
+            success: false,
+            error: errorMessage
+        });
+    }
+}
+
+/**
+ * POST /api/vs/:folderName/stop
+ * Para um VS
+ */
+async function stopVS(req, res) {
+    try {
+        const { folderName } = req.params;
+        const username = req.user.username;
+        
+        const result = await vsService.stopVS(folderName, username);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Virtual server stopped successfully'
+        });
+        
+    } catch (error) {
+        console.error('Error in stopVS:', error);
+        
+        let statusCode = 500;
+        let errorMessage = error.message;
+        
+        if (error.message.includes('not found')) {
+            statusCode = 404;
+        } else if (error.message.includes('Access denied')) {
+            statusCode = 403;
+        } else if (error.message.includes('Cannot stop')) {
+            statusCode = 400;
+        }
+        
+        res.status(statusCode).json({
+            success: false,
+            error: errorMessage
+        });
+    }
+}
+
+/**
+ * DELETE /api/vs/:folderName
+ * Elimina um VS
+ */
+async function deleteVS(req, res) {
+    try {
+        const { folderName } = req.params;
+        const username = req.user.username;
+        
+        const result = await vsService.deleteVS(folderName, username);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Virtual server deleted successfully'
+        });
+        
+    } catch (error) {
+        console.error('Error in deleteVS:', error);
+        
+        let statusCode = 500;
+        let errorMessage = error.message;
+        
+        if (error.message.includes('not found')) {
+            statusCode = 404;
+        } else if (error.message.includes('Access denied')) {
+            statusCode = 403;
+        } else if (error.message.includes('Cannot delete')) {
+            statusCode = 400;
+        }
+        
+        res.status(statusCode).json({
+            success: false,
+            error: errorMessage
+        });
+    }
+}
+
 module.exports = {
     getUserVSList,
     getAllVSList,
     getVSDetails,
     getUserCredit,
-    createVS         
+    createVS,
+    startVS,
+    stopVS,
+    deleteVS
 };

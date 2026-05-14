@@ -1,6 +1,7 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router, NavigationEnd } from '@angular/router';
+import { CreditService } from '../services/credit.service'
 import { VSService } from '../services/vs.service';
 import { VirtualServer } from '../models/vs.model';
 
@@ -298,8 +299,16 @@ export class VSListComponent implements OnInit {
     
     constructor(
         private vsService: VSService,
-        private cdr: ChangeDetectorRef
-    ) {}
+        private creditService: CreditService,
+        private cdr: ChangeDetectorRef,
+        private router: Router
+    ) {
+        this.router.events.subscribe(event => {
+        if (event instanceof NavigationEnd && event.url === '/vs') {
+            this.loadVSList();
+        }
+    });
+}
     
     ngOnInit(): void {
         this.loadVSList();

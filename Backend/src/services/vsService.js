@@ -145,22 +145,34 @@ async function getVSDetails(vsFolder, extended = false) {
     
     const attrValues = await getMultipleAttributes(vsFolder, baseAttributes);
     
-    // Hard status
+    // Hard status - executar isRunning no nó correto
     let hardStatus = null;
-    if (attrValues.VS_HOST && attrValues.VS_HOST.trim() !== '') {
+    const vsHost = attrValues.VS_HOST ? attrValues.VS_HOST.trim() : null;
+    
+    if (vsHost && vsHost !== '') {
         try {
-            const isRunningOutput = await runLocalCommand(`/${vsFolder}/isRunning`);
-            hardStatus = isRunningOutput.trim();
+            // Executar isRunning remotamente no nó onde o VS está a correr
+            const remoteCommand = `/ctl/runRemote ${vsHost} ${vsFolder} isRunning`;
+            console.log(`Getting hard status from node ${vsHost} for ${vsFolder}`);
+            const output = await runLocalCommand(remoteCommand);
+            hardStatus = output.trim();
         } catch (error) {
-            console.error(`Error getting hard status for ${vsFolder}:`, error);
-            hardStatus = 'unknown';
+            console.error(`Error getting hard status from ${vsHost}:`, error.message);
+            // Se falhar, assumir que não está a correr
+            hardStatus = 'stopped';
         }
+    } else {
+        // Sem host, o VS está parado
+        hardStatus = 'stopped';
     }
     
-    const effectiveCost = await getEffectiveCost(vsFolder, attrValues.VS_HOST);
+    console.log(`VS ${vsFolder} - Soft: ${attrValues.VS_STATUS}, Hard: ${hardStatus}, Host: ${vsHost}`)
+    
+    const effectiveCost = await getEffectiveCost(vsFolder, vsHost);
     const typeNumber = parseInt(folderInfo.type);
     let typeDescription = await getTypeDescription(typeNumber);
     
+    // Estrutura base do VS
     const vsDetails = {
         id: folderInfo.id,
         type: typeNumber,
@@ -170,7 +182,7 @@ async function getVSDetails(vsFolder, extended = false) {
         description: isVST ? attrValues.VST_DESC : attrValues.VS_DESC,
         softStatus: attrValues.VS_STATUS?.toLowerCase() || 'stopped',
         hardStatus: hardStatus,
-        host: attrValues.VS_HOST || null,
+        host: vsHost,
         cost: effectiveCost,
         baseCost: parseInt(attrValues.VST_COST) || 0,
         dtr: parseInt(attrValues.VS_DTR) || 30,
@@ -196,7 +208,6 @@ async function getVSDetails(vsFolder, extended = false) {
         
         const additionalValues = await getMultipleAttributes(vsFolder, additionalAttrs);
         
-        // Atualizar typeDescription se existir VS_TYPE_DESC
         if (additionalValues.VS_TYPE_DESC && additionalValues.VS_TYPE_DESC.trim() !== '') {
             vsDetails.typeDescription = additionalValues.VS_TYPE_DESC;
         }
@@ -347,6 +358,118 @@ async function createVS(vstFolderName, username) {
     }
 }
 
+/**
+ * Inicia um VS
+ * @param {string} vsFolderName - Nome da pasta do VS
+ * @param {string} username - Nome do utilizador (para verificar permissão)
+ */
+async function startVS(vsFolderName, username) {
+    try {
+        const vsDetails = await getVSDetails(vsFolderName, false);
+        
+        if (!vsDetails) {
+            throw new Error(`VS ${vsFolderName} not found`);
+        }
+        
+        if (vsDetails.owner !== username) {
+            throw new Error(`Access denied. You do not own this virtual server.`);
+        }
+        
+        // Verificar se o VS está parado
+        if (vsDetails.softStatus !== 'stopped') {
+            throw new Error(`Cannot start VS. Current status: ${vsDetails.softStatus}`);
+        }
+        const command = `/ctl/start ${vsFolderName}`;
+        console.log(`Starting VS: ${command}`);
+        
+        const output = await runLocalCommand(command);
+        console.log(`Start command output: ${output}`);
+        
+        return {
+            success: true,
+            message: 'Virtual server started successfully'
+        };
+        
+    } catch (error) {
+        console.error(`Error starting VS ${vsFolderName}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Para um VS
+ * @param {string} vsFolderName - Nome da pasta do VS
+ * @param {string} username - Nome do utilizador (para verificar permissão)
+ */
+async function stopVS(vsFolderName, username) {
+    try {
+        const vsDetails = await getVSDetails(vsFolderName, false);
+        
+        if (!vsDetails) {
+            throw new Error(`VS ${vsFolderName} not found`);
+        }
+        
+        if (vsDetails.owner !== username) {
+            throw new Error(`Access denied. You do not own this virtual server.`);
+        }
+        if (vsDetails.softStatus !== 'running' && vsDetails.softStatus !== 'starting') {
+            throw new Error(`Cannot stop VS. Current status: ${vsDetails.softStatus}`);
+        }
+        const command = `/ctl/stop ${vsFolderName}`;
+        console.log(`Stopping VS: ${command}`);
+        
+        const output = await runLocalCommand(command);
+        console.log(`Stop command output: ${output}`);
+        
+        return {
+            success: true,
+            message: 'Virtual server stopped successfully'
+        };
+        
+    } catch (error) {
+        console.error(`Error stopping VS ${vsFolderName}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Elimina um VS
+ * @param {string} vsFolderName - Nome da pasta do VS
+ * @param {string} username - Nome do utilizador (para verificar permissão)
+ */
+async function deleteVS(vsFolderName, username) {
+    try {
+        const vsDetails = await getVSDetails(vsFolderName, false);
+        
+        if (!vsDetails) {
+            throw new Error(`VS ${vsFolderName} not found`);
+        }
+        
+        if (vsDetails.owner !== username) {
+            throw new Error(`Access denied. You do not own this virtual server.`);
+        }
+        if (vsDetails.softStatus !== 'stopped') {
+            throw new Error(`Cannot delete VS. Please stop it first. Current status: ${vsDetails.softStatus}`);
+        }
+        const command = `/ctl/delete ${vsFolderName}`;
+        console.log(`Deleting VS: ${command}`);
+        
+        const output = await runLocalCommand(command);
+        console.log(`Delete command output: ${output}`);
+        
+        return {
+            success: true,
+            message: 'Virtual server deleted successfully',
+            folderName: vsFolderName
+        };
+        
+    } catch (error) {
+        console.error(`Error deleting VS ${vsFolderName}:`, error);
+        throw error;
+    }
+}
+
+
 module.exports = {
     listFolders,
     getVSDetails,
@@ -357,5 +480,8 @@ module.exports = {
     getNetworkConfig,
     getVSTDetails,
     getTypeDescription,
-    createVS
+    createVS,
+    startVS,
+    stopVS,
+    deleteVS
 };

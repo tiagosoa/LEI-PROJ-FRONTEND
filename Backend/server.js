@@ -11,12 +11,12 @@ const vsRoutes = require('./src/routes/vsRoutes');
 const vstRoutes = require('./src/routes/vstRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 80;
 
 const corsOptions = {
     origin: [
-        'http://localhost:4200',
-        'http://127.0.0.1:4200',
+        'http://localhost:80',
+        'http://127.0.0.1:80',
         'http://cloud.dei.isep.ipp.pt',
         'https://cloud.dei.isep.ipp.pt'
     ],

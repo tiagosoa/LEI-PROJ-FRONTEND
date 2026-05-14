@@ -40,4 +40,16 @@ export class VSService {
     createVS(vstFolderName: string): Observable<any> {
         return this.http.post(`${this.apiUrl}/vs/create`, { vstFolderName });
     }
+
+    startVS(folderName: string): Observable<any> {
+        return this.http.post(`${this.apiUrl}/vs/${folderName}/start`, {});
+    }
+    
+    stopVS(folderName: string): Observable<any> {
+        return this.http.post(`${this.apiUrl}/vs/${folderName}/stop`, {});
+    }
+    
+    deleteVS(folderName: string): Observable<any> {
+        return this.http.delete(`${this.apiUrl}/vs/${folderName}`);
+    }
 }

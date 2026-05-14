@@ -138,16 +138,14 @@ export class AppComponent implements OnInit, OnDestroy {
         this.creditSubscription = this.creditService.credit$.subscribe(credit => {
             this.credit = credit;
             this.isLoadingCredit = false;
-            this.cdr.detectChanges();  // Forçar atualização imediata
+            this.cdr.detectChanges(); 
         });
         
         // Subscrever mudanças no utilizador autenticado
         this.userSubscription = this.authService.currentUser$.subscribe(user => {
             if (user) {
-                // Utilizador autenticado - carregar crédito imediatamente
                 this.loadCredit();
             } else {
-                // Sem utilizador - limpar crédito
                 this.credit = null;
                 this.cdr.detectChanges();
             }
@@ -157,7 +155,6 @@ export class AppComponent implements OnInit, OnDestroy {
         this.routerSubscription = this.router.events.pipe(
             filter(event => event instanceof NavigationEnd)
         ).subscribe(() => {
-            // Verificar se ainda está autenticado após navegação
             if (this.authService.isAuthenticated()) {
                 this.loadCredit();
             }

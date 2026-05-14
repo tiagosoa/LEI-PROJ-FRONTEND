@@ -8,6 +8,9 @@ router.use(authenticate);
 
 router.get('/credit', vsController.getUserCredit);
 router.post('/create', vsController.createVS);
+router.post('/:folderName/start', vsController.startVS);
+router.post('/:folderName/stop', vsController.stopVS);
+router.delete('/:folderName', vsController.deleteVS);
 router.get('/', vsController.getUserVSList);
 router.get('/all', vsController.getAllVSList);
 router.get('/:folderName', vsController.getVSDetails);

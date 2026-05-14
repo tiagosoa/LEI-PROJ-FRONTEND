@@ -2,6 +2,7 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { VSService } from '../services/vs.service';
+import { CreditService } from '../services/credit.service';
 import { VirtualServer, CustomAccess } from '../models/vs.model';
 
 @Component({
@@ -14,14 +15,20 @@ import { VirtualServer, CustomAccess } from '../models/vs.model';
                 <button class="back-btn" (click)="goBack()">Back to VS List</button>
                 <h1>{{ vs.name || 'Virtual Server' }}</h1>
                 <div class="action-buttons">
-                    <button class="action-btn start" [disabled]="vs.softStatus === 'running'" (click)="startVS()">
-                        Start
+                    <button class="action-btn start" 
+                            [disabled]="vs.softStatus === 'running' || isActionInProgress" 
+                            (click)="startVS()">
+                        {{ isStarting ? 'Starting...' : 'Start' }}
                     </button>
-                    <button class="action-btn stop" [disabled]="vs.softStatus !== 'running'" (click)="stopVS()">
-                        Stop
+                    <button class="action-btn stop" 
+                            [disabled]="vs.softStatus !== 'running' || isActionInProgress" 
+                            (click)="stopVS()">
+                        {{ isStopping ? 'Stopping...' : 'Stop' }}
                     </button>
-                    <button class="action-btn delete" [disabled]="vs.softStatus === 'running'" (click)="deleteVS()">
-                        Delete
+                    <button class="action-btn delete" 
+                            [disabled]="vs.softStatus === 'running' || isActionInProgress" 
+                            (click)="deleteVS()">
+                        {{ isDeleting ? 'Deleting...' : 'Delete' }}
                     </button>
                 </div>
             </div>
@@ -518,11 +525,18 @@ export class VSDetailsComponent implements OnInit {
     isLoading = true;
     errorMessage: string = '';
     showPassword: { [key: number]: boolean } = {};
+    actionMessage: string = '';
+    isError: boolean = false;
+    isActionInProgress: boolean = false;
+    isStarting: boolean = false;
+    isStopping: boolean = false;
+    isDeleting: boolean = false;
     
     constructor(
         private route: ActivatedRoute,
         private router: Router,
         private vsService: VSService,
+        private creditService: CreditService,
         private cdr: ChangeDetectorRef
     ) {}
     
@@ -542,52 +556,160 @@ export class VSDetailsComponent implements OnInit {
         });
     }
     
-    loadVSDetails(folderName: string): void {
-        console.log('Loading VS details for:', folderName);
-        this.isLoading = true;
-        this.cdr.detectChanges();
-        
-        this.vsService.getVSDetails(folderName).subscribe({
-            next: (response) => {
-                console.log('VS details response:', response);
-                if (response.success && response.data) {
-                    this.vs = response.data;
-                    console.log('VS details loaded:', this.vs);
-                } else {
-                    this.errorMessage = 'Failed to load virtual server details';
-                }
-                this.isLoading = false;
-                this.cdr.detectChanges();
-            },
-            error: (error) => {
-                console.error('Error loading VS details:', error);
-                this.errorMessage = `Error: ${error.message || 'Failed to load details'}`;
-                this.isLoading = false;
-                this.cdr.detectChanges();
+// Adicionar no ngOnInit, depois de carregar os detalhes
+loadVSDetails(folderName: string): void {
+    this.isLoading = true;
+    this.cdr.detectChanges();
+    
+    this.vsService.getVSDetails(folderName).subscribe({
+        next: (response) => {
+            if (response.success && response.data) {
+                this.vs = response.data;
+            } else {
+                // VS não encontrado
+                this.handleNotFound();
             }
-        });
-    }
+            this.isLoading = false;
+            this.cdr.detectChanges();
+        },
+        error: (error) => {
+            console.error('Error loading VS details:', error);
+            this.handleNotFound();
+        }
+    });
+}
+
+private handleNotFound(): void {
+    alert('Virtual server not found or has been deleted.');
+    this.router.navigate(['/vs']);
+}
     
     goBack(): void {
         this.router.navigate(['/vs']);
     }
     
     startVS(): void {
-        console.log('Start VS:', this.vs?.folderName);
-        // TODO: Implementar na US6
+        if (!this.vs) return;
+        
+        this.isStarting = true;
+        this.isActionInProgress = true;
+        this.actionMessage = '';
+        this.isError = false;
+        this.cdr.detectChanges();
+        
+        this.vsService.startVS(this.vs.folderName).subscribe({
+            next: (response) => {
+                this.actionMessage = 'Virtual server started successfully!';
+                this.isError = false;
+                // Recarregar detalhes para atualizar o estado
+                setTimeout(() => {
+                    this.loadVSDetails(this.vs!.folderName);
+                    // Atualizar crédito (o custo duplica quando running)
+                    this.creditService.refreshCredit();
+                }, 2000);
+                this.isStarting = false;
+                this.isActionInProgress = false;
+                this.cdr.detectChanges();
+            },
+            error: (error) => {
+                this.actionMessage = error.error?.error || 'Failed to start virtual server';
+                this.isError = true;
+                this.isStarting = false;
+                this.isActionInProgress = false;
+                this.cdr.detectChanges();
+                
+                // Limpar mensagem após 5 segundos
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 5000);
+            }
+        });
     }
     
     stopVS(): void {
-        console.log('Stop VS:', this.vs?.folderName);
-        // TODO: Implementar na US7
+        if (!this.vs) return;
+        
+        this.isStopping = true;
+        this.isActionInProgress = true;
+        this.actionMessage = '';
+        this.isError = false;
+        this.cdr.detectChanges();
+        
+        this.vsService.stopVS(this.vs.folderName).subscribe({
+            next: (response) => {
+                this.actionMessage = 'Virtual server stopped successfully!';
+                this.isError = false;
+                // Recarregar detalhes para atualizar o estado
+                setTimeout(() => {
+                    this.loadVSDetails(this.vs!.folderName);
+                    // Atualizar crédito (o custo volta ao normal quando parado)
+                    this.creditService.refreshCredit();
+                }, 2000);
+                this.isStopping = false;
+                this.isActionInProgress = false;
+                this.cdr.detectChanges();
+            },
+            error: (error) => {
+                this.actionMessage = error.error?.error || 'Failed to stop virtual server';
+                this.isError = true;
+                this.isStopping = false;
+                this.isActionInProgress = false;
+                this.cdr.detectChanges();
+                
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 5000);
+            }
+        });
     }
     
-    deleteVS(): void {
-        if (confirm('Are you sure you want to delete this virtual server? This action cannot be undone.')) {
-            console.log('Delete VS:', this.vs?.folderName);
-            // TODO: Implementar na US8
+deleteVS(): void {
+    if (!this.vs) return;
+    
+    const confirmDelete = confirm(`Are you sure you want to delete "${this.vs.name}"? This action cannot be undone.`);
+    
+    if (!confirmDelete) return;
+    
+    this.isDeleting = true;
+    this.isActionInProgress = true;
+    this.actionMessage = '';
+    this.isError = false;
+    this.cdr.detectChanges();
+    
+    this.vsService.deleteVS(this.vs.folderName).subscribe({
+        next: (response) => {
+            this.actionMessage = 'Virtual server deleted successfully! Redirecting...';
+            this.isError = false;
+            
+            // Atualizar crédito
+            this.creditService.refreshCredit();
+            this.vs = null;
+            
+            setTimeout(() => {
+                // Usar replaceUrl para não manter a página apagada no histórico
+                this.router.navigate(['/vs'], { replaceUrl: true });
+            }, 1500);
+            
+            this.isDeleting = false;
+            this.isActionInProgress = false;
+            this.cdr.detectChanges();
+        },
+        error: (error) => {
+            this.actionMessage = error.error?.error || 'Failed to delete virtual server';
+            this.isError = true;
+            this.isDeleting = false;
+            this.isActionInProgress = false;
+            this.cdr.detectChanges();
+            
+            setTimeout(() => {
+                this.actionMessage = '';
+                this.cdr.detectChanges();
+            }, 5000);
         }
-    }
+    });
+}
     
     togglePassword(accessId: number, inputElement: HTMLInputElement): void {
         this.showPassword[accessId] = !this.showPassword[accessId];
