@@ -5,6 +5,7 @@ export interface VirtualServer {
     isVST: boolean;
     name: string;
     description: string;
+    vstDescription?: string;
     softStatus: string;
     hardStatus: string | null;
     host: string | null;

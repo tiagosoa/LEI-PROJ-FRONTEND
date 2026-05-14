@@ -8,7 +8,6 @@ const creditService = require('../services/creditService');
 async function getUserVSList(req, res) {
     try {
         const username = req.user.username;
-        // Para listagem, não precisamos de extended (mais rápido)
         const vsList = await vsService.getUserVS(username, false);
         
         res.json({
@@ -278,6 +277,52 @@ async function deleteVS(req, res) {
     }
 }
 
+/**
+ * PUT /api/vs/:folderName/attribute
+ * Altera um atributo do VS
+ */
+async function setAttribute(req, res) {
+    try {
+        const { folderName } = req.params;
+        const { attributeName, value, isBase64 } = req.body;
+        const username = req.user.username;
+        
+        if (!attributeName || value === undefined) {
+            return res.status(400).json({
+                success: false,
+                error: 'Attribute name and value are required'
+            });
+        }
+        
+        const result = await vsService.setAttribute(folderName, username, attributeName, value, isBase64);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: result.message
+        });
+        
+    } catch (error) {
+        console.error('Error in setAttribute:', error);
+        
+        let statusCode = 500;
+        let errorMessage = error.message;
+        
+        if (error.message.includes('not found')) {
+            statusCode = 404;
+        } else if (error.message.includes('Access denied')) {
+            statusCode = 403;
+        } else if (error.message.includes('not editable')) {
+            statusCode = 400;
+        }
+        
+        res.status(statusCode).json({
+            success: false,
+            error: errorMessage
+        });
+    }
+}
+
 module.exports = {
     getUserVSList,
     getAllVSList,
@@ -286,5 +331,6 @@ module.exports = {
     createVS,
     startVS,
     stopVS,
-    deleteVS
+    deleteVS,
+    setAttribute
 };

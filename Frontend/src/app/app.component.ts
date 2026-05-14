@@ -17,12 +17,15 @@ import { CreditInfo } from './models/credit.model';
                     <h1>DEI Private Cloud</h1>
                 </div>
                 <div class="header-right">
+                    <div class="dashboard-link">
+                        <button routerLink="/dashboard">Dashboard</button>
+                    </div> 
                     <div class="credit-info" *ngIf="credit">
                         <span class="credit-label">Used credit:</span>
                         <span class="credit-value" [class.warning]="isLowCredit()">
                             {{ credit.used }} / {{ credit.total }}
                         </span>
-                    </div>
+                    </div>   
                     <div class="credit-info" *ngIf="!credit && isLoadingCredit">
                         <span class="credit-label">Loading credit...</span>
                     </div>
@@ -82,6 +85,21 @@ import { CreditInfo } from './models/credit.model';
         
         .credit-value.warning {
             color: #ffc107;
+        }
+
+        .dashboard-link {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .dashboard-link button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
         }
         
         .user-info {

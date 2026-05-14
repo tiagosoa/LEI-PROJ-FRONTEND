@@ -37,15 +37,11 @@ async function authenticateUser(username, password) {
 
             // Autenticação bem-sucedida
             console.log(`User ${normalizedUsername} authenticated successfully`);
-            
-            // Opcional: Buscar atributos adicionais do utilizador (grupos, email, etc.)
-            // Por agora, retornamos informação básica
             client.destroy();
             
             resolve({
                 username: normalizedUsername,
                 authenticated: true,
-                // TODO: Adicionar verificação de admin se necessário
                 isAdmin: false // Será verificado depois via getCredit
             });
         });

@@ -4,11 +4,12 @@ import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { VSService } from '../services/vs.service';
 import { CreditService } from '../services/credit.service';
 import { VirtualServer, CustomAccess } from '../models/vs.model';
+import { FormsModule } from '@angular/forms';
 
 @Component({
     selector: 'app-vs-details',
     standalone: true,
-    imports: [CommonModule, RouterModule],
+    imports: [CommonModule, RouterModule, FormsModule],
     template: `
         <div class="details-container" *ngIf="!isLoading && vs; else loading">
             <div class="details-header">
@@ -74,7 +75,7 @@ import { VirtualServer, CustomAccess } from '../models/vs.model';
                     </div>
                     <div class="info-row">
                         <span class="label">Type:</span>
-                        <span class="value">{{ vs.typeDescription }}</span>
+                        <span class="value">{{ getTypeDisplay(vs) }}</span>
                     </div>
                     <div class="info-row">
                         <span class="label">Cost:</span>
@@ -87,30 +88,54 @@ import { VirtualServer, CustomAccess } from '../models/vs.model';
                         <span class="label">Days to Run (DTR):</span>
                         <span class="value" [class.low]="vs.dtr < 5">{{ vs.dtr }} days remaining</span>
                     </div>
+                    <div class="info-row">
+                        <span class="label">Name:</span>
+                        <span class="value editable-value">
+                            <span *ngIf="!isEditingName">{{ vs.name }}</span>
+                            <input *ngIf="isEditingName" 
+                                   [(ngModel)]="editingNameValue" 
+                                   class="edit-input"
+                                   (keyup.enter)="saveName()"
+                                   (keyup.escape)="cancelEditName()"
+                                   autofocus>
+                            <button *ngIf="!isEditingName" class="edit-icon" (click)="startEditName()" title="Edit name">✏️</button>
+                            <button *ngIf="isEditingName" class="save-icon" (click)="saveName()" [disabled]="isSaving">💾</button>
+                            <button *ngIf="isEditingName" class="cancel-icon" (click)="cancelEditName()">✖️</button>
+                        </span>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Description Section -->
+
+            <!-- Description Section-->
             <div class="info-card">
                 <h3>Description</h3>
-                <p class="description">{{ vs.description || 'No description provided.' }}</p>
-            </div>
-            
-            <!-- Network Configuration Section -->
-            <div class="info-card" *ngIf="vs.networkConfigs && vs.networkConfigs.length > 0">
-                <h3>Network Configuration</h3>
-                <div class="network-table">
-                    <div class="network-header">
-                        <span>Network</span>
-                        <span>IPv4</span>
-                        <span>IPv6</span>
-                        <span>MAC Address</span>
+                <div class="description-container">
+                    <div class="description-column">
+                        <div class="description-header">
+                            <strong>VS Description (editable)</strong>
+                            <button *ngIf="!isEditingDescription" class="edit-icon-small" (click)="startEditDescription()">✏️ Edit</button>
+                        </div>
+                        <div *ngIf="!isEditingDescription" class="description-content">
+                            {{ vs.description || 'No description provided.' }}
+                        </div>
+                        <div *ngIf="isEditingDescription" class="description-edit">
+                            <textarea [(ngModel)]="editingDescriptionValue" 
+                                      rows="10" 
+                                      class="edit-textarea"
+                                      placeholder="Enter description..."></textarea>
+                            <div class="edit-actions">
+                                <button class="save-btn" (click)="saveDescription()" [disabled]="isSaving">Save</button>
+                                <button class="cancel-btn" (click)="cancelEditDescription()">Cancel</button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="network-row" *ngFor="let net of vs.networkConfigs">
-                        <span class="net-name">{{ net.name }}</span>
-                        <span class="net-ip">{{ net.ipv4 || '-' }}</span>
-                        <span class="net-ip6">{{ net.ipv6 || '-' }}</span>
-                        <span class="net-mac">{{ net.mac || '-' }}</span>
+                    <div class="description-column">
+                        <div class="description-header">
+                            <strong>Original Template Description (read-only)</strong>
+                        </div>
+                        <div class="description-content read-only">
+                            {{ vs.vstDescription || 'No template description available.' }}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -139,10 +164,32 @@ import { VirtualServer, CustomAccess } from '../models/vs.model';
                             </div>
                         </div>
                         <div class="access-action" *ngIf="access.canChangePassword">
-                            <button class="change-pass-btn" (click)="changePassword(access.id)">
+                            <button class="change-pass-btn" (click)="openPasswordModal(access.id)">
                                  {{ access.changeDescription || 'Change Password' }}
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>          
+
+            <!-- Modal para mudar password (FORA do loop) -->
+            <div class="modal-overlay" *ngIf="showPasswordModal" (click)="closePasswordModal()">
+                <div class="modal-content" (click)="$event.stopPropagation()">
+                    <div class="modal-header">
+                        <h3>{{ selectedAccess?.changeDescription || 'Change Password' }}</h3>
+                        <button class="modal-close" (click)="closePasswordModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <label>New Password:</label>
+                        <input type="password" [(ngModel)]="newPassword" class="password-input-modal" placeholder="Enter new password">
+                        <label style="margin-top: 12px;">Confirm Password:</label>
+                        <input type="password" [(ngModel)]="confirmPassword" class="password-input-modal" placeholder="Confirm new password">
+                    </div>
+                    <div class="modal-footer">
+                        <button class="save-btn" (click)="saveNewPassword()" [disabled]="!newPassword || newPassword !== confirmPassword || isSaving">
+                            {{ isSaving ? 'Saving...' : 'Save' }}
+                        </button>
+                        <button class="cancel-btn" (click)="closePasswordModal()">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -165,7 +212,6 @@ import { VirtualServer, CustomAccess } from '../models/vs.model';
             </div>
         </ng-template>
     `,
-    // Adiciona/modifica estas classes nos styles do componente:
 
 styles: [`
     .details-container {
@@ -264,7 +310,6 @@ styles: [`
         padding-bottom: 8px;
     }
     
-    /* Sub-blocks dentro dos cards também com borders */
     .status-grid, .info-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -311,8 +356,7 @@ styles: [`
     .network-row:last-child {
         border-bottom: none;
     }
-    
-    /* Access items com borders */
+ 
     .access-list {
         display: flex;
         flex-direction: column;
@@ -488,6 +532,216 @@ styles: [`
         margin: 0 auto 20px;
     }
     
+    .editable-value {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }   
+
+    .edit-input {
+        padding: 6px 10px;
+        border: 1px solid #333;
+        border-radius: 4px;
+        font-size: 14px;
+        width: 200px;
+    }   
+
+    .edit-icon, .save-icon, .cancel-icon {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 0 4px;
+    }   
+
+    .edit-icon:hover { opacity: 0.7; }
+    .save-icon { color: #28a745; }
+    .cancel-icon { color: #dc3545; }    
+
+    .description-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }   
+
+    .description-column {
+        border: 1px solid #333;
+        border-radius: 8px;
+        overflow: hidden;
+    }   
+
+    .description-header {
+        background: #f8f9fa;
+        padding: 12px 16px;
+        border-bottom: 1px solid #333;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }   
+
+    .edit-icon-small {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #667eea;
+        font-size: 12px;
+    }   
+
+    .edit-icon-small:hover {
+        text-decoration: underline;
+    }   
+
+    .description-content {
+        padding: 16px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        min-height: 150px;
+    }   
+
+    .description-content.read-only {
+        background: #fafafa;
+        color: #666;
+    }   
+
+    .description-edit {
+        padding: 16px;
+    }   
+
+    .edit-textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #333;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        resize: vertical;
+    }   
+
+    .edit-actions {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+    }   
+
+    .save-btn {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 6px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    }   
+
+    .save-btn:hover:not(:disabled) {
+        background: #218838;
+    }   
+
+    .save-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }   
+
+    .cancel-btn {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 6px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    }   
+
+    .cancel-btn:hover {
+        background: #5a6268;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }   
+
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        max-width: 450px;
+        width: 90%;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }   
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        border-bottom: 1px solid #e9ecef;
+        background: #2c3e50;
+        color: white;
+        border-radius: 12px 12px 0 0;
+    }   
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+    }   
+
+    .modal-close {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+        margin: 0;
+    }   
+
+    .modal-close:hover {
+        opacity: 0.8;
+    }   
+
+    .modal-body {
+        padding: 20px;
+    }   
+
+    .modal-body label {
+        display: block;
+        margin-bottom: 5px;
+        color: #555;
+        font-weight: 500;
+    }   
+
+    .password-input-modal {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+    }   
+
+    .password-input-modal:focus {
+        outline: none;
+        border-color: #667eea;
+    }   
+
+    .modal-footer {
+        padding: 16px 20px;
+        border-top: 1px solid #e9ecef;
+        text-align: right;
+        background: #f8f9fa;
+        border-radius: 0 0 12px 12px;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+    
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
@@ -520,6 +774,7 @@ styles: [`
         }
     `]
 })
+
 export class VSDetailsComponent implements OnInit {
     vs: VirtualServer | null = null;
     isLoading = true;
@@ -531,6 +786,16 @@ export class VSDetailsComponent implements OnInit {
     isStarting: boolean = false;
     isStopping: boolean = false;
     isDeleting: boolean = false;
+    isEditingName: boolean = false;
+    isEditingDescription: boolean = false;
+    editingNameValue: string = '';
+    editingDescriptionValue: string = '';
+    isSaving: boolean = false;
+    showPasswordModal: boolean = false;
+    selectedAccessId: number = 0;
+    selectedAccess: any = null;
+    newPassword: string = '';
+    confirmPassword: string = '';
     
     constructor(
         private route: ActivatedRoute,
@@ -556,33 +821,54 @@ export class VSDetailsComponent implements OnInit {
         });
     }
     
-// Adicionar no ngOnInit, depois de carregar os detalhes
-loadVSDetails(folderName: string): void {
-    this.isLoading = true;
-    this.cdr.detectChanges();
-    
-    this.vsService.getVSDetails(folderName).subscribe({
-        next: (response) => {
-            if (response.success && response.data) {
-                this.vs = response.data;
-            } else {
-                // VS não encontrado
+    loadVSDetails(folderName: string): void {
+        this.isLoading = true;
+        this.cdr.detectChanges();
+
+        this.vsService.getVSDetails(folderName).subscribe({
+            next: (response) => {
+                if (response.success && response.data) {
+                    this.vs = response.data;
+                } else {
+                    // VS não encontrado
+                    this.handleNotFound();
+                }
+                this.isLoading = false;
+                this.cdr.detectChanges();
+            },
+            error: (error) => {
+                console.error('Error loading VS details:', error);
                 this.handleNotFound();
             }
-            this.isLoading = false;
-            this.cdr.detectChanges();
-        },
-        error: (error) => {
-            console.error('Error loading VS details:', error);
-            this.handleNotFound();
+        });
+    }
+    getTypeDisplay(vs: VirtualServer): string {
+        if (vs.typeDescription && vs.typeDescription.includes(' - ')) {
+            return vs.typeDescription;
         }
-    });
-}
 
-private handleNotFound(): void {
-    alert('Virtual server not found or has been deleted.');
-    this.router.navigate(['/vs']);
-}
+        const typeMap: { [key: number]: string } = {
+            0: '0 - Fake/Testing',
+            1: '1 - QEMU/KVM',
+            2: '2 - Docker',
+            3: '3 - LXD',
+            4: '4 - Single application',
+            5: '5 - VMware',
+            6: '6 - Virtual Box',
+            7: '7 - LXC',
+            8: '8 - FreeBSD Jail',
+            9: '9 - SYSBOX',
+            10: '10 - PODMAN',
+            11: '11 - INCUS'
+        };
+
+        return typeMap[vs.type] || vs.typeDescription || `Type ${vs.type}`;
+    }
+
+    private handleNotFound(): void {
+        alert('Virtual server not found or has been deleted.');
+        this.router.navigate(['/vs']);
+    }
     
     goBack(): void {
         this.router.navigate(['/vs']);
@@ -617,8 +903,6 @@ private handleNotFound(): void {
                 this.isStarting = false;
                 this.isActionInProgress = false;
                 this.cdr.detectChanges();
-                
-                // Limpar mensagem após 5 segundos
                 setTimeout(() => {
                     this.actionMessage = '';
                     this.cdr.detectChanges();
@@ -640,10 +924,8 @@ private handleNotFound(): void {
             next: (response) => {
                 this.actionMessage = 'Virtual server stopped successfully!';
                 this.isError = false;
-                // Recarregar detalhes para atualizar o estado
                 setTimeout(() => {
                     this.loadVSDetails(this.vs!.folderName);
-                    // Atualizar crédito (o custo volta ao normal quando parado)
                     this.creditService.refreshCredit();
                 }, 2000);
                 this.isStopping = false;
@@ -665,51 +947,145 @@ private handleNotFound(): void {
         });
     }
     
-deleteVS(): void {
-    if (!this.vs) return;
-    
-    const confirmDelete = confirm(`Are you sure you want to delete "${this.vs.name}"? This action cannot be undone.`);
-    
-    if (!confirmDelete) return;
-    
-    this.isDeleting = true;
-    this.isActionInProgress = true;
-    this.actionMessage = '';
-    this.isError = false;
-    this.cdr.detectChanges();
-    
-    this.vsService.deleteVS(this.vs.folderName).subscribe({
-        next: (response) => {
-            this.actionMessage = 'Virtual server deleted successfully! Redirecting...';
-            this.isError = false;
-            
-            // Atualizar crédito
-            this.creditService.refreshCredit();
-            this.vs = null;
-            
-            setTimeout(() => {
-                // Usar replaceUrl para não manter a página apagada no histórico
-                this.router.navigate(['/vs'], { replaceUrl: true });
-            }, 1500);
-            
-            this.isDeleting = false;
-            this.isActionInProgress = false;
-            this.cdr.detectChanges();
-        },
-        error: (error) => {
-            this.actionMessage = error.error?.error || 'Failed to delete virtual server';
-            this.isError = true;
-            this.isDeleting = false;
-            this.isActionInProgress = false;
-            this.cdr.detectChanges();
-            
-            setTimeout(() => {
-                this.actionMessage = '';
+    deleteVS(): void {
+        if (!this.vs) return;
+
+        const confirmDelete = confirm(`Are you sure you want to delete "${this.vs.name}"? This action cannot be undone.`);
+
+        if (!confirmDelete) return;
+
+        this.isDeleting = true;
+        this.isActionInProgress = true;
+        this.actionMessage = '';
+        this.isError = false;
+        this.cdr.detectChanges();
+
+        this.vsService.deleteVS(this.vs.folderName).subscribe({
+            next: () => {
+                this.actionMessage = 'Virtual server deleted successfully! Redirecting...';
+                this.isError = false;
+
+                // Atualizar crédito
+                this.creditService.refreshCredit();
+                this.vs = null;
+
+                setTimeout(() => {
+                    // Usar replaceUrl para não manter a página apagada no histórico
+                    this.router.navigate(['/vs'], { replaceUrl: true });
+                }, 1500);
+
+                this.isDeleting = false;
+                this.isActionInProgress = false;
                 this.cdr.detectChanges();
-            }, 5000);
-        }
-    });
-}
+            },
+            error: (error) => {
+                this.actionMessage = error.error?.error || 'Failed to delete virtual server';
+                this.isError = true;
+                this.isDeleting = false;
+                this.isActionInProgress = false;
+                this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 5000);
+            }
+        });
+    }
+
+    startEditName(): void {
+        if (!this.vs) return;
+        this.editingNameValue = this.vs.name || '';
+        this.isEditingName = true;
+        this.cdr.detectChanges();
+    }
+
+    cancelEditName(): void {
+        this.isEditingName = false;
+        this.editingNameValue = '';
+        this.cdr.detectChanges();
+    }
+
+    saveName(): void {
+        if (!this.vs || !this.editingNameValue.trim()) return;
+
+        this.isSaving = true;
+        this.cdr.detectChanges();
+
+        this.vsService.setAttribute(this.vs.folderName, 'VS_NAME', this.editingNameValue.trim()).subscribe({
+            next: () => {
+                this.vs!.name = this.editingNameValue.trim();
+                this.isEditingName = false;
+                this.isSaving = false;
+                this.actionMessage = 'Name updated successfully!';
+                this.isError = false;
+                this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 3000);
+            },
+            error: (error) => {
+                this.actionMessage = error.error?.error || 'Failed to update name';
+                this.isError = true;
+                this.isSaving = false;
+                this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 5000);
+            }
+        });
+    }
+
+    startEditDescription(): void {
+        if (!this.vs) return;
+        this.editingDescriptionValue = this.vs.description || '';
+        this.isEditingDescription = true;
+        this.cdr.detectChanges();
+    }
+
+    cancelEditDescription(): void {
+        this.isEditingDescription = false;
+        this.editingDescriptionValue = '';
+        this.cdr.detectChanges();
+    }
+
+    saveDescription(): void {
+        if (!this.vs) return;
+
+        this.isSaving = true;
+        this.cdr.detectChanges();
+
+        this.vsService.setAttribute(this.vs.folderName, 'VS_DESC', this.editingDescriptionValue || '').subscribe({
+            next: () => {
+                this.vs!.description = this.editingDescriptionValue || '';
+                this.isEditingDescription = false;
+                this.isSaving = false;
+                this.actionMessage = 'Description updated successfully!';
+                this.isError = false;
+                this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 3000);
+            },
+            error: (error) => {
+                this.actionMessage = error.error?.error || 'Failed to update description';
+                this.isError = true;
+                this.isSaving = false;
+                this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 5000);
+            }
+        });
+    }
     
     togglePassword(accessId: number, inputElement: HTMLInputElement): void {
         this.showPassword[accessId] = !this.showPassword[accessId];
@@ -722,9 +1098,72 @@ deleteVS(): void {
         navigator.clipboard.writeText(password);
         alert('Password copied to clipboard!');
     }
+
+    openPasswordModal(accessId: number): void {
+        this.selectedAccessId = accessId;
+        this.selectedAccess = this.vs?.customAccesses?.find(a => a.id === accessId);
+        this.newPassword = '';
+        this.confirmPassword = '';
+        this.showPasswordModal = true;
+        this.cdr.detectChanges();
+    }   
+
+    closePasswordModal(): void {
+        this.showPasswordModal = false;
+        this.selectedAccessId = 0;
+        this.selectedAccess = null;
+        this.newPassword = '';
+        this.confirmPassword = '';
+        this.cdr.detectChanges();
+    }   
+
+    saveNewPassword(): void {
+        if (!this.newPassword || this.newPassword !== this.confirmPassword) {
+            alert('Passwords do not match or are empty');
+            return;
+        }
+
+        if (!this.vs) return;
+
+        this.isSaving = true;
+        this.cdr.detectChanges();
+
+        const attributeName = `CUSTOM_ACCESS${this.selectedAccessId}_PASS`;
+        this.vsService.setAttribute(this.vs.folderName, attributeName, this.newPassword, true).subscribe({
+            next: () => {
+                // Atualizar localmente
+                if (this.vs?.customAccesses) {
+                    const access = this.vs.customAccesses.find(a => a.id === this.selectedAccessId);
+                    if (access) {
+                        access.password = this.newPassword;
+                    }
+                }
+                this.closePasswordModal();
+                this.isSaving = false;
+                this.actionMessage = 'Password changed successfully!';
+                this.isError = false;
+                this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 3000);
+            },
+            error: (error) => {
+                this.actionMessage = error.error?.error || 'Failed to change password';
+                this.isError = true;
+                this.isSaving = false;
+                this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 5000);
+            }
+        });
+    }   
     
     changePassword(accessId: number): void {
-        console.log('Change password for access:', accessId);
-        // TODO: Implementar na US9
+        this.openPasswordModal(accessId);
     }
 }

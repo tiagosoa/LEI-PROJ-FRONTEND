@@ -1,7 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
-import { CreditService } from '../services/credit.service'
 import { VSService } from '../services/vs.service';
 import { VirtualServer } from '../models/vs.model';
 
@@ -30,13 +29,12 @@ import { VirtualServer } from '../models/vs.model';
                 <p>Go to Templates to create your first VS!</p>
             </div>
             
-            <!-- Tabela com as colunas corretas -->
             <div *ngIf="!isLoading && vsList.length > 0" class="vs-table-container">
                 <table class="vs-table">
                     <thead>
                         <tr>
                             <th>VS/VST</th>
-                            <th>VS/VST Name (click to manage)</th>
+                            <th>VS/VST Name</th>
                             <th>Soft Status</th>
                             <th>Cost</th>
                             <th>DTR (Days To Run)</th>
@@ -64,11 +62,9 @@ import { VirtualServer } from '../models/vs.model';
                             <td class="dtr-cell" [class.low-dtr]="vs.dtr < 5">
                                 {{ vs.dtr }}
                             </td>
-                            <!-- Original Template Name: usar o nome do template (vem do VST_NAME) -->
                             <td class="template-cell">
                                 {{ vs.vstName || 'N/A' }}
                             </td>
-                            <!-- Virtual Server Type: mostrar descrição, não o número -->
                             <td class="type-cell">
                                 {{ getTypeDescription(vs) }}
                             </td>
@@ -299,7 +295,6 @@ export class VSListComponent implements OnInit {
     
     constructor(
         private vsService: VSService,
-        private creditService: CreditService,
         private cdr: ChangeDetectorRef,
         private router: Router
     ) {
@@ -365,15 +360,32 @@ export class VSListComponent implements OnInit {
     }
     
     getTypeDescription(vs: VirtualServer): string {
-        if (vs.typeDescription) {
+        // Se o backend já retornar no formato correto, usar diretamente
+        if (vs.typeDescription && vs.typeDescription.includes(' - ')) {
             return vs.typeDescription;
         }
+        
+        // Fallback caso o backend não retorne o formato esperado
         const typeMap: { [key: number]: string } = {
             0: '0 - Fake/Testing',
             1: '1 - QEMU/KVM',
             2: '2 - Docker',
-            7: '7 - LXC'
+            3: '3 - LXD',
+            4: '4 - Single application',
+            5: '5 - VMware',
+            6: '6 - Virtual Box',
+            7: '7 - LXC',
+            8: '8 - FreeBSD Jail',
+            9: '9 - SYSBOX',
+            10: '10 - PODMAN',
+            11: '11 - INCUS'
         };
-        return typeMap[vs.type] || `Type ${vs.type}`;
+        
+        if (typeMap[vs.type]) {
+            return typeMap[vs.type];
+        }
+        
+        // Se o tipo não estiver no mapa, usar a descrição do backend ou fallback
+        return vs.typeDescription || `Type ${vs.type}`;
     }
 }

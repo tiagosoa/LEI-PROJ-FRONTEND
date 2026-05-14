@@ -60,7 +60,7 @@ import { AuthService } from '../services/auth.service';
         justify-content: center;
         align-items: center;
         min-height: 100vh;
-        background: #e0e0e0;  /* Cinzento em vez de gradiente roxo */
+        background: #e0e0e0;
     }
     .login-card {
         background: white;
@@ -121,7 +121,7 @@ import { AuthService } from '../services/auth.service';
     button {
         width: 100%;
         padding: 12px;
-        background: #4a90e2;  /* Azul sólido em vez de gradiente */
+        background: #4a90e2;
         color: white;
         border: none;
         border-radius: 4px;
@@ -131,7 +131,7 @@ import { AuthService } from '../services/auth.service';
         transition: background-color 0.2s;
     }
     button:hover:not(:disabled) {
-        background: #357abd;  /* Azul mais escuro ao passar o rato */
+        background: #357abd; 
     }
     button:disabled {
         background: #ccc;

@@ -7,7 +7,7 @@ const { authenticate } = require('../middleware/authMiddleware');
 router.post('/login', authController.login);
 router.post('/logout', authController.logout);
 
-// Rota protegida (exemplo)
+// Rota protegida
 router.get('/me', authenticate, authController.getCurrentUser);
 
 module.exports = router;

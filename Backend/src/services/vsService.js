@@ -1,4 +1,4 @@
-const { runLocalCommand, getAttribute, getMultipleAttributes, BASE_FOLDER } = require('../utils/commandExecutor');
+const { runLocalCommand, runRemoteCommandOnNode, getAttribute, getMultipleAttributes, BASE_FOLDER } = require('../utils/commandExecutor');
 const fs = require('fs').promises;
 
 let typeDescriptionCache = null;
@@ -44,12 +44,17 @@ async function getEffectiveCost(vsFolder, vsHost) {
 
 /**
  * Obtém a descrição do tipo de VS com cache simples
+ * Retorna no formato "Número - Designação" (ex: "7 - LXC")
  * @param {number} typeNumber - Número do tipo (ex: 7)
  */
 async function getTypeDescription(typeNumber) {
     const now = Date.now();
     if (typeDescriptionCache && typeDescriptionCacheTime && (now - typeDescriptionCacheTime) < CACHE_TTL) {
-        return typeDescriptionCache[typeNumber] || `Type ${typeNumber}`;
+        const desc = typeDescriptionCache[typeNumber];
+        if (desc) {
+            return `${typeNumber} - ${desc}`;
+        }
+        return `${typeNumber} - Unknown Type`;
     }
     
     try {
@@ -59,6 +64,7 @@ async function getTypeDescription(typeNumber) {
         const typeMap = {};
         const lines = content.split('\n');
         for (const line of lines) {
+            // Formato: "7: LXC" ou "7 LXC"
             const match = line.match(/^(\d+)[:\s\t]+(.+)$/);
             if (match) {
                 const num = parseInt(match[1]);
@@ -70,10 +76,14 @@ async function getTypeDescription(typeNumber) {
         typeDescriptionCache = typeMap;
         typeDescriptionCacheTime = now;
         
-        return typeMap[typeNumber] || `Type ${typeNumber}`;
+        const desc = typeMap[typeNumber];
+        if (desc) {
+            return `${typeNumber} - ${desc}`;
+        }
+        return `${typeNumber} - Unknown Type`;
     } catch (error) {
-        console.log(`Could not read types file, using default: ${typeNumber}`);
-        return `Type ${typeNumber}`;
+        console.log(`Could not read types file, using default for type ${typeNumber}`);
+        return `${typeNumber} - Type ${typeNumber}`;
     }
 }
 
@@ -140,8 +150,9 @@ async function getVSDetails(vsFolder, extended = false) {
     
     // Atributos base
     const baseAttributes = isVST 
-        ? ['VST_NAME', 'VST_DESC', 'VS_STATUS', 'VST_COST', 'VS_HOST', 'VS_DTR', 'VST_DISABLED']
-        : ['VS_NAME', 'VS_DESC', 'VS_STATUS', 'VST_COST', 'VS_HOST', 'VS_DTR'];
+    ? ['VST_NAME', 'VST_DESC', 'VS_STATUS', 'VST_COST', 'VS_HOST', 'VS_DTR', 'VST_DISABLED']
+    : ['VS_NAME', 'VS_DESC', 'VS_STATUS', 'VST_COST', 'VS_HOST', 'VS_DTR', 'VST_NAME', 'VST_DESC'];  
+
     
     const attrValues = await getMultipleAttributes(vsFolder, baseAttributes);
     
@@ -180,6 +191,8 @@ async function getVSDetails(vsFolder, extended = false) {
         isVST: isVST,
         name: isVST ? attrValues.VST_NAME : attrValues.VS_NAME,
         description: isVST ? attrValues.VST_DESC : attrValues.VS_DESC,
+        vstName: attrValues.VST_NAME || null,
+        vstDescription: attrValues.VST_DESC || null,
         softStatus: attrValues.VS_STATUS?.toLowerCase() || 'stopped',
         hardStatus: hardStatus,
         host: vsHost,
@@ -469,6 +482,86 @@ async function deleteVS(vsFolderName, username) {
     }
 }
 
+/**
+ * Altera um atributo de um VS
+ * @param {string} vsFolderName - Nome da pasta do VS
+ * @param {string} username - Nome do utilizador (para verificar permissão)
+ * @param {string} attributeName - Nome do atributo (ex: VS_NAME, VS_DESC, CUSTOM_ACCESS1_PASS)
+ * @param {string} value - Novo valor
+ */
+async function setAttribute(vsFolderName, username, attributeName, value) {
+    try {
+        // Verificar se o VS existe e pertence ao utilizador
+        const vsDetails = await getVSDetails(vsFolderName, false);
+        
+        if (!vsDetails) {
+            throw new Error(`VS ${vsFolderName} not found`);
+        }
+        
+        if (vsDetails.owner !== username) {
+            throw new Error(`Access denied. You do not own this virtual server.`);
+        }
+        
+        // Verificar se o atributo é editável
+        const editableAttributes = ['VS_NAME', 'VS_DESC'];
+        const customAccessMatch = attributeName.match(/^CUSTOM_ACCESS(\d+)_PASS$/);
+        
+        if (!editableAttributes.includes(attributeName) && !customAccessMatch) {
+            throw new Error(`Attribute ${attributeName} is not editable`);
+        }
+        const base64Value = Buffer.from(value, 'utf8').toString('base64');
+        const attributeWithSuffix = `${attributeName}64`;
+        
+        // Obter o nó onde executar o comando
+        const node = await getBestNodeForVS(vsFolderName);
+        
+        // Executar comando setInfo remotamente com valor em base64
+        const command = `setInfo ${attributeWithSuffix} ${base64Value}`;
+        console.log(`Setting attribute: ${command} on node ${node}`);
+        
+        const output = await runRemoteCommandOnNode(node, vsFolderName, command);
+        
+        return {
+            success: true,
+            message: `Attribute ${attributeName} updated successfully`,
+            output: output
+        };
+        
+    } catch (error) {
+        console.error(`Error setting attribute ${attributeName} for ${vsFolderName}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Obtém o melhor nó para executar um comando num VS
+ * @param {string} vsFolderName - Nome da pasta do VS
+ */
+async function getBestNodeForVS(vsFolderName) {
+    try {
+        // Primeiro verificar se VS_HOST está definido
+        const vsHost = await getAttribute(vsFolderName, 'VS_HOST');
+        if (vsHost && vsHost.trim() !== '') {
+            console.log(`Using VS_HOST: ${vsHost}`);
+            return vsHost.trim();
+        }
+        
+        // Caso contrário, usar getBestNodeForVS
+        const output = await runLocalCommand(`/ctl/getBestNodeForVS ${vsFolderName}`);
+        const node = output.trim();
+        console.log(`getBestNodeForVS returned: ${node}`);
+        
+        if (!node) {
+            // Fallback: usar localhost
+            return 'localhost';
+        }
+        return node;
+    } catch (error) {
+        console.error(`Error getting best node for ${vsFolderName}:`, error);
+        return 'localhost';
+    }
+}
+
 
 module.exports = {
     listFolders,
@@ -483,5 +576,6 @@ module.exports = {
     createVS,
     startVS,
     stopVS,
-    deleteVS
+    deleteVS,
+    setAttribute
 };

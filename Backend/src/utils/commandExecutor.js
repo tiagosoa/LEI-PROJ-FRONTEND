@@ -53,9 +53,29 @@ async function getMultipleAttributes(vsFolder, attributeNames) {
     return results;
 }
 
+/**
+ * Executa um comando remotamente num nó específico
+ * @param {string} node - IP do nó
+ * @param {string} vsFolder - Nome da pasta do VS
+ * @param {string} command - Comando a executar (sem o caminho do VS)
+ */
+async function runRemoteCommandOnNode(node, vsFolder, command) {
+    try {
+        const remoteCmd = `/ctl/runRemote ${node} ${vsFolder} ${command}`;
+        console.log(`Remote command: ${remoteCmd}`);
+        
+        const output = await runLocalCommand(remoteCmd);
+        return output;
+    } catch (error) {
+        console.error(`Error running remote command on ${node}:`, error);
+        throw error;
+    }
+}
+
 module.exports = {
     runLocalCommand,
     getAttribute,
     getMultipleAttributes,
+    runRemoteCommandOnNode,
     BASE_FOLDER
 };

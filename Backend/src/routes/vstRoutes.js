@@ -6,7 +6,7 @@ const { authenticate } = require('../middleware/authMiddleware');
 // Todas as rotas de VST requerem autenticação
 router.use(authenticate);
 
-// Rotas (ordem importante: /all antes de /:folderName)
+// Rotas
 router.get('/all', vstController.getAllVSTs);
 router.get('/', vstController.getAvailableVSTs);
 router.get('/:folderName', vstController.getVSTDetails);

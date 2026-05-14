@@ -450,32 +450,32 @@ export class VSTListComponent implements OnInit {
 
 
     createVS(vst: VirtualServerTemplate): void {
-    if (confirm(`Create a new virtual server from template "${vst.name}"?`)) {
-        this.creatingVS = true;
-        this.cdr.detectChanges();
-        
-        this.vsService.createVS(vst.folderName).subscribe({
-            next: (response) => {
-                if (response.success) {
-                    alert(`Virtual server created successfully!`);
-                    this.creditService.refreshCredit();
-                    this.router.navigate(['/vs']);
+        if (confirm(`Create a new virtual server from template "${vst.name}"?`)) {
+            this.creatingVS = true;
+            this.cdr.detectChanges();
+            
+            this.vsService.createVS(vst.folderName).subscribe({
+                next: (response) => {
+                    if (response.success) {
+                        alert(`Virtual server created successfully!`);
+                        this.creditService.refreshCredit();
+                        this.router.navigate(['/vs']);
+                    }
+                    this.creatingVS = false;
+                    this.cdr.detectChanges();
+                },
+                error: (error) => {
+                    console.error('Error creating VS:', error);
+                    if (error.status === 403 && error.error?.error === 'Insufficient credit') {
+                        const credit = error.error?.credit;
+                        alert(`Insufficient credit! You need ${vst.cost} credits but only have ${credit?.available || 0} available.`);
+                    } else {
+                        alert(`Failed to create virtual server: ${error.error?.error || 'Unknown error'}`);
+                    }
+                    this.creatingVS = false;
+                    this.cdr.detectChanges();
                 }
-                this.creatingVS = false;
-                this.cdr.detectChanges();
-            },
-            error: (error) => {
-                console.error('Error creating VS:', error);
-                if (error.status === 403 && error.error?.error === 'Insufficient credit') {
-                    const credit = error.error?.credit;
-                    alert(`Insufficient credit! You need ${vst.cost} credits but only have ${credit?.available || 0} available.`);
-                } else {
-                    alert(`Failed to create virtual server: ${error.error?.error || 'Unknown error'}`);
-                }
-                this.creatingVS = false;
-                this.cdr.detectChanges();
-            }
-        });
-    }
+            });
+        }
     }
 }

@@ -52,4 +52,8 @@ export class VSService {
     deleteVS(folderName: string): Observable<any> {
         return this.http.delete(`${this.apiUrl}/vs/${folderName}`);
     }
+
+    setAttribute(folderName: string, attributeName: string, value: string, isBase64: boolean = false): Observable<any> {
+        return this.http.put(`${this.apiUrl}/vs/${folderName}/attribute`, { attributeName, value, isBase64 });
+    }
 }
