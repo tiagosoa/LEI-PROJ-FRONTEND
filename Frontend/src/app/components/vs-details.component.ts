@@ -147,14 +147,22 @@ import { FormsModule } from '@angular/forms';
                     <div class="access-item" *ngFor="let access of vs.customAccesses">
                         <div class="access-header">
                             <span class="access-title">Access #{{ access.id }}</span>
-                            <span class="access-status" [class.enabled]="access.enabled" [class.disabled]="!access.enabled">
-                                {{ access.enabled ? 'Enabled' : 'Disabled' }}
-                            </span>
+                            <div class="access-controls">
+                                <button class="toggle-btn" 
+                                        [class.enabled]="access.enabled" 
+                                        [class.disabled]="!access.enabled"
+                                        (click)="toggleAccess(access.id, !access.enabled)"
+                                        [disabled]="isTogglingAccess[access.id]">
+                                    {{ isTogglingAccess[access.id] ? 'Updating...' : (access.enabled ? 'Disable' : 'Enable') }}
+                                </button>
+                            </div>
                         </div>
-                        <div class="access-description" [innerHTML]="access.description"></div>
-                        <div class="access-password" *ngIf="access.password">
-                            <span class="label">Password:</span>
-                            <div class="password-field">
+                        <div class="access-description" [innerHTML]="cleanAccessDescription(access.description)"></div>
+                        
+                        <!-- Password Section -->
+                        <div class="access-password-section" *ngIf="access.password">
+                            <div class="password-label">Password:</div>
+                            <div class="password-field" [class.disabled]="!access.enabled">
                                 <input [type]="showPassword[access.id] ? 'text' : 'password'" 
                                        [value]="access.password" 
                                        readonly
@@ -162,17 +170,21 @@ import { FormsModule } from '@angular/forms';
                                 <button (click)="togglePassword(access.id, passwordInput)">{{ showPassword[access.id] ? 'Hide' : 'Show' }}</button>
                                 <button (click)="copyPassword(access.password)">Copy</button>
                             </div>
+                            <div *ngIf="!access.enabled" class="disabled-warning">
+                                Access is disabled - password is not usable
+                            </div>
                         </div>
+                        
                         <div class="access-action" *ngIf="access.canChangePassword">
                             <button class="change-pass-btn" (click)="openPasswordModal(access.id)">
-                                 {{ access.changeDescription || 'Change Password' }}
+                                {{ access.changeDescription || 'Change Password' }}
                             </button>
                         </div>
                     </div>
                 </div>
-            </div>          
-
-            <!-- Modal para mudar password (FORA do loop) -->
+            </div>
+            
+            <!-- Change password -->
             <div class="modal-overlay" *ngIf="showPasswordModal" (click)="closePasswordModal()">
                 <div class="modal-content" (click)="$event.stopPropagation()">
                     <div class="modal-header">
@@ -382,6 +394,12 @@ styles: [`
         padding-bottom: 8px;
         border-bottom: 1px solid #333;
     }
+
+    .access-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
     
     .access-title {
         font-weight: 500;
@@ -389,19 +407,24 @@ styles: [`
     }
     
     .access-status {
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 0.75rem;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
-    
+
     .access-status.enabled {
         background: #d4edda;
         color: #155724;
+        border: 1px solid #c3e6cb;
     }
-    
+
     .access-status.disabled {
         background: #f8d7da;
         color: #721c24;
+        border: 1px solid #f5c6cb;
     }
     
     .access-description {
@@ -450,6 +473,71 @@ styles: [`
     
     .password-field button:hover {
         background: #5a67d8;
+    }
+    
+    .toggle-btn {
+        padding: 4px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.75rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .toggle-btn.enabled {
+        background: #dc3545;
+        color: white;
+    }
+
+    .toggle-btn.enabled:hover:not(:disabled) {
+        background: #c82333;
+    }
+
+    .toggle-btn.disabled {
+        background: #28a745;
+        color: white;
+    }
+
+    .toggle-btn.disabled:hover:not(:disabled) {
+        background: #218838;
+    }
+
+    .toggle-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .access-status {
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
+
+    .access-status.enabled {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .access-status.disabled {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .password-field.disabled {
+        background: #e9ecef;
+    }
+
+    .password-field.disabled input:disabled {
+        background: #e9ecef;
+        cursor: not-allowed;
+    }
+
+    .disabled-note {
+        font-size: 0.7rem;
+        color: #6c757d;
+        margin-left: 8px;
     }
     
     .change-pass-btn {
@@ -796,6 +884,7 @@ export class VSDetailsComponent implements OnInit {
     selectedAccess: any = null;
     newPassword: string = '';
     confirmPassword: string = '';
+    isTogglingAccess: { [key: number]: boolean } = {};  
     
     constructor(
         private route: ActivatedRoute,
@@ -1162,8 +1251,67 @@ export class VSDetailsComponent implements OnInit {
             }
         });
     }   
-    
+
     changePassword(accessId: number): void {
         this.openPasswordModal(accessId);
+    }
+
+    /**
+     * Ativa ou desativa um método de acesso
+     * @param accessId - ID do acesso (1-25)
+     * @param enabled - true para ativar, false para desativar
+     */
+    toggleAccess(accessId: number, enabled: boolean): void {
+        if (!this.vs) return;
+        
+        this.isTogglingAccess[accessId] = true;
+        this.cdr.detectChanges();
+        
+        const action = enabled ? 'enable' : 'disable';
+        
+        this.vsService.toggleAccessEnabled(this.vs.folderName, accessId, enabled).subscribe({
+            next: () => {
+                // Recarregar os detalhes completos do VS para obter o estado atualizado
+                this.loadVSDetails(this.vs!.folderName);
+                
+                this.isTogglingAccess[accessId] = false;
+                this.actionMessage = `Access ${action}d successfully!`;
+                this.isError = false;
+                this.cdr.detectChanges();
+                
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 3000);
+            },
+            error: (error) => {
+                console.error(`Error ${action}ing access:`, error);
+                this.actionMessage = error.error?.error || `Failed to ${action} access`;
+                this.isError = true;
+                this.isTogglingAccess[accessId] = false;
+                this.cdr.detectChanges();
+                
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 5000);
+            }
+        });
+    }
+
+    /**
+     * Limpa a descrição do acesso removendo indicações de ENABLED/DISABLED (fallback)
+     */
+    cleanAccessDescription(description: string): string {
+        if (!description) return '';
+
+        // Remover padrões como "ENABLED", "DISABLED", " (Enabled)", " - ENABLED", etc.
+        let cleaned = description
+            .replace(/\s*\(?(ENABLED|DISABLED)\)?\s*/gi, '')
+            .replace(/\s*-\s*(ENABLED|DISABLED)\s*/gi, '')
+            .replace(/\s*(ENABLED|DISABLED)\s*$/gi, '')
+            .trim();
+
+        return cleaned || description;
     }
 }

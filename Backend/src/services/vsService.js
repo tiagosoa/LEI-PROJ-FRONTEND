@@ -87,24 +87,35 @@ async function getTypeDescription(typeNumber) {
     }
 }
 
-/**
- * Obtém os custom accesses de um VS
- */
 async function getCustomAccesses(vsFolder) {
     const customAccesses = [];
     
     for (let i = 1; i <= 25; i++) {
-        const desc = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_DESC`);
+        let desc = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_DESC`);
         if (desc && desc.trim() !== '') {
             const password = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_PASS`);
-            const enabledDisabled = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_ENABLED_DISABLED`);
+            let enabledDisabled = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_ENABLED_DISABLED`);
             const passChange = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_PASS_CHANGE`);
+            
+            // Limpar a descrição - remover indicações de ENABLED/DISABLED
+            desc = desc.replace(/\s*\(?(ENABLED|DISABLED)\)?\s*/gi, '');
+            desc = desc.replace(/\s*-\s*(ENABLED|DISABLED)\s*/gi, '');
+            desc = desc.trim();
+            
+            if (!desc) {
+                desc = `Access #${i}`;
+            }
+            
+            let enabled = true;
+            if (enabledDisabled && enabledDisabled.trim() !== '') {
+                enabled = enabledDisabled.trim().toLowerCase() === 'enabled';
+            }
             
             customAccesses.push({
                 id: i,
                 description: desc,
                 password: password || null,
-                enabled: !enabledDisabled || enabledDisabled === 'enabled',
+                enabled: enabled,
                 canChangePassword: !!(passChange && passChange.trim() !== ''),
                 changeDescription: passChange || null
             });
@@ -486,12 +497,11 @@ async function deleteVS(vsFolderName, username) {
  * Altera um atributo de um VS
  * @param {string} vsFolderName - Nome da pasta do VS
  * @param {string} username - Nome do utilizador (para verificar permissão)
- * @param {string} attributeName - Nome do atributo (ex: VS_NAME, VS_DESC, CUSTOM_ACCESS1_PASS)
+ * @param {string} attributeName - Nome do atributo
  * @param {string} value - Novo valor
  */
 async function setAttribute(vsFolderName, username, attributeName, value) {
     try {
-        // Verificar se o VS existe e pertence ao utilizador
         const vsDetails = await getVSDetails(vsFolderName, false);
         
         if (!vsDetails) {
@@ -502,20 +512,24 @@ async function setAttribute(vsFolderName, username, attributeName, value) {
             throw new Error(`Access denied. You do not own this virtual server.`);
         }
         
-        // Verificar se o atributo é editável
         const editableAttributes = ['VS_NAME', 'VS_DESC'];
-        const customAccessMatch = attributeName.match(/^CUSTOM_ACCESS(\d+)_PASS$/);
+        const customAccessMatch = attributeName.match(/^CUSTOM_ACCESS(\d+)_(PASS|ENABLED_DISABLED)$/);
         
         if (!editableAttributes.includes(attributeName) && !customAccessMatch) {
             throw new Error(`Attribute ${attributeName} is not editable`);
         }
+        
+        if (attributeName.includes('ENABLED_DISABLED')) {
+            if (value !== 'enabled' && value !== 'disabled') {
+                throw new Error(`ENABLED_DISABLED must be 'enabled' or 'disabled'`);
+            }
+        }
+        
         const base64Value = Buffer.from(value, 'utf8').toString('base64');
         const attributeWithSuffix = `${attributeName}64`;
         
-        // Obter o nó onde executar o comando
         const node = await getBestNodeForVS(vsFolderName);
         
-        // Executar comando setInfo remotamente com valor em base64
         const command = `setInfo ${attributeWithSuffix} ${base64Value}`;
         console.log(`Setting attribute: ${command} on node ${node}`);
         

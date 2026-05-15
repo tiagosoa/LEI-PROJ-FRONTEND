@@ -56,4 +56,10 @@ export class VSService {
     setAttribute(folderName: string, attributeName: string, value: string, isBase64: boolean = false): Observable<any> {
         return this.http.put(`${this.apiUrl}/vs/${folderName}/attribute`, { attributeName, value, isBase64 });
     }
+
+    toggleAccessEnabled(folderName: string, accessId: number, enabled: boolean): Observable<any> {
+        const attributeName = `CUSTOM_ACCESS${accessId}_ENABLED_DISABLED`;
+        const value = enabled ? 'enabled' : 'disabled';
+        return this.setAttribute(folderName, attributeName, value);
+    }
 }

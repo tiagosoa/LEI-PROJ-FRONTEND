@@ -40,6 +40,7 @@ export interface CustomAccess {
     enabled: boolean;
     canChangePassword: boolean;
     changeDescription: string | null;
+    enabledDisabled?: string; 
 }
 
 export interface VSListResponse {
