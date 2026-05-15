@@ -53,6 +53,10 @@ export class VSService {
         return this.http.delete(`${this.apiUrl}/vs/${folderName}`);
     }
 
+    resetDTR(folderName: string): Observable<any> {
+        return this.http.post(`${this.apiUrl}/vs/${folderName}/reset-dtr`, {});
+    }
+
     setAttribute(folderName: string, attributeName: string, value: string, isBase64: boolean = false): Observable<any> {
         return this.http.put(`${this.apiUrl}/vs/${folderName}/attribute`, { attributeName, value, isBase64 });
     }

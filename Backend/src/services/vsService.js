@@ -576,6 +576,38 @@ async function getBestNodeForVS(vsFolderName) {
     }
 }
 
+/**
+ * Reseta o DTR (Days To Run) para o valor padrão (30 dias)
+ * @param {string} vsFolderName - Nome da pasta do VS
+ * @param {string} username - Nome do utilizador
+ */
+async function resetDTR(vsFolderName, username) {
+    try {
+        const vsDetails = await getVSDetails(vsFolderName, false);
+        
+        if (!vsDetails) {
+            throw new Error(`VS ${vsFolderName} not found`);
+        }
+        
+        if (vsDetails.owner !== username) {
+            throw new Error(`Access denied. You do not own this virtual server.`);
+        }
+        
+        const node = await getBestNodeForVS(vsFolderName);
+        const command = `setInfo VS_DTR64 $(echo -n '30' | base64)`;
+        const output = await runRemoteCommandOnNode(node, vsFolderName, command);
+        
+        return {
+            success: true,
+            message: 'DTR reset to 30 days successfully'
+        };
+        
+    } catch (error) {
+        console.error(`Error resetting DTR for ${vsFolderName}:`, error);
+        throw error;
+    }
+}
+
 
 module.exports = {
     listFolders,
@@ -591,5 +623,6 @@ module.exports = {
     startVS,
     stopVS,
     deleteVS,
-    setAttribute
+    setAttribute,
+    resetDTR
 };

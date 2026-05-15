@@ -12,6 +12,7 @@ router.post('/:folderName/start', vsController.startVS);
 router.post('/:folderName/stop', vsController.stopVS);
 router.delete('/:folderName', vsController.deleteVS);
 router.put('/:folderName/attribute', vsController.setAttribute);
+router.post('/:folderName/reset-dtr', vsController.resetDTR);
 router.get('/', vsController.getUserVSList);
 router.get('/all', vsController.getAllVSList);
 router.get('/:folderName', vsController.getVSDetails);

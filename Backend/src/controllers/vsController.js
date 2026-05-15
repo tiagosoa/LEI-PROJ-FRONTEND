@@ -323,6 +323,44 @@ async function setAttribute(req, res) {
     }
 }
 
+/**
+ * POST /api/vs/:folderName/reset-dtr
+ * Reseta o DTR (Days To Run) para o valor padrão (30 dias)
+ */
+async function resetDTR(req, res) {
+    try {
+        const { folderName } = req.params;
+        const username = req.user.username;
+        
+        const result = await vsService.resetDTR(folderName, username);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: result.message
+        });
+        
+    } catch (error) {
+        console.error('Error in resetDTR:', error);
+        
+        let statusCode = 500;
+        let errorMessage = error.message;
+        
+        if (error.message.includes('not found')) {
+            statusCode = 404;
+        } else if (error.message.includes('Access denied')) {
+            statusCode = 403;
+        } else if (error.message.includes('must be stopped')) {
+            statusCode = 400;
+        }
+        
+        res.status(statusCode).json({
+            success: false,
+            error: errorMessage
+        });
+    }
+}
+
 module.exports = {
     getUserVSList,
     getAllVSList,
@@ -332,5 +370,6 @@ module.exports = {
     startVS,
     stopVS,
     deleteVS,
-    setAttribute
+    setAttribute,
+    resetDTR
 };

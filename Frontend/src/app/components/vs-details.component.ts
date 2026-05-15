@@ -86,7 +86,12 @@ import { FormsModule } from '@angular/forms';
                     </div>
                     <div class="info-row">
                         <span class="label">Days to Run (DTR):</span>
-                        <span class="value" [class.low]="vs.dtr < 5">{{ vs.dtr }} days remaining</span>
+                        <span class="value" [class.low]="vs.dtr < 5">
+                            {{ vs.dtr }} days remaining
+                            <button class="reset-dtr-btn" (click)="resetDTR()" [disabled]="isResettingDTR">
+                                {{ isResettingDTR ? 'Resetting...' : 'Reset to 30 days' }}
+                            </button>
+                        </span>
                     </div>
                     <div class="info-row">
                         <span class="label">Name:</span>
@@ -160,9 +165,9 @@ import { FormsModule } from '@angular/forms';
                         <div class="access-description" [innerHTML]="cleanAccessDescription(access.description)"></div>
                         
                         <!-- Password Section -->
-                        <div class="access-password-section" *ngIf="access.password">
-                            <div class="password-label">Password:</div>
-                            <div class="password-field" [class.disabled]="!access.enabled">
+                        <div class="access-password" *ngIf="access.password && access.enabled">
+                            <span class="label">Password:</span>
+                            <div class="password-field">
                                 <input [type]="showPassword[access.id] ? 'text' : 'password'" 
                                        [value]="access.password" 
                                        readonly
@@ -170,8 +175,15 @@ import { FormsModule } from '@angular/forms';
                                 <button (click)="togglePassword(access.id, passwordInput)">{{ showPassword[access.id] ? 'Hide' : 'Show' }}</button>
                                 <button (click)="copyPassword(access.password)">Copy</button>
                             </div>
-                            <div *ngIf="!access.enabled" class="disabled-warning">
-                                Access is disabled - password is not usable
+                        </div>
+
+                        <div class="access-password" *ngIf="access.password && !access.enabled">
+                            <span class="label">Password:</span>
+                            <div class="password-field disabled">
+                                <input type="password" 
+                                       value="****************" 
+                                       readonly
+                                       disabled>
                             </div>
                         </div>
                         
@@ -884,7 +896,8 @@ export class VSDetailsComponent implements OnInit {
     selectedAccess: any = null;
     newPassword: string = '';
     confirmPassword: string = '';
-    isTogglingAccess: { [key: number]: boolean } = {};  
+    isTogglingAccess: { [key: number]: boolean } = {}; 
+    isResettingDTR: boolean = false; 
     
     constructor(
         private route: ActivatedRoute,
@@ -1313,5 +1326,60 @@ export class VSDetailsComponent implements OnInit {
             .trim();
 
         return cleaned || description;
+    }
+    
+/**
+ * Reseta o DTR (Days To Run) para 30 dias
+ */
+resetDTR(): void {
+    if (!this.vs) return;
+    
+    // Verificar se o VS está parado
+    if (this.vs.softStatus !== 'stopped') {
+        alert('Cannot reset DTR. Virtual server must be stopped first.');
+        return;
+    }
+    
+    const confirmReset = confirm(`Reset Days to Run (DTR) for "${this.vs.name}" from ${this.vs.dtr} days to 30 days?`);
+    
+    if (!confirmReset) return;
+    
+    this.isResettingDTR = true;
+    this.actionMessage = '';
+    this.isError = false;
+    this.cdr.detectChanges();
+    
+    this.vsService.resetDTR(this.vs.folderName).subscribe({
+        next: (response) => {
+            if (this.vs && response.data?.newDTR) {
+                this.vs.dtr = response.data.newDTR;
+            }
+            
+            this.actionMessage = response.message || 'DTR reset successfully!';
+            this.isError = false;
+            this.isResettingDTR = false;
+            this.cdr.detectChanges();
+            
+            setTimeout(() => {
+                this.loadVSDetails(this.vs!.folderName);
+            }, 1000);
+            
+            setTimeout(() => {
+                this.actionMessage = '';
+                this.cdr.detectChanges();
+            }, 3000);
+        },
+        error: (error) => {
+            console.error('Error resetting DTR:', error);
+            this.actionMessage = error.error?.error || 'Failed to reset DTR';
+            this.isError = true;
+            this.isResettingDTR = false;
+            this.cdr.detectChanges();
+            setTimeout(() => {
+                this.actionMessage = '';
+                this.cdr.detectChanges();
+            }, 5000);
+        }
+    });
     }
 }
