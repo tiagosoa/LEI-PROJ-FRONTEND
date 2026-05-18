@@ -1,8 +1,10 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
+import { CreditService } from '../services/credit.service';
 import { VSService } from '../services/vs.service';
 import { VirtualServer } from '../models/vs.model';
+import { Subscription, interval } from 'rxjs';
 
 @Component({
     selector: 'app-vs-list',
@@ -12,11 +14,6 @@ import { VirtualServer } from '../models/vs.model';
         <div class="vs-list-container">
             <div class="header">
                 <h2>My Virtual Servers</h2>
-                <div class="refresh-btn">
-                    <button (click)="refreshList()" [disabled]="isLoading">
-                        Refresh
-                    </button>
-                </div>
             </div>
             
             <div *ngIf="isLoading" class="loading">
@@ -29,55 +26,53 @@ import { VirtualServer } from '../models/vs.model';
                 <p>Go to Templates to create your first VS!</p>
             </div>
             
-            <div *ngIf="!isLoading && vsList.length > 0" class="vs-table-container">
-                <table class="vs-table">
-                    <thead>
-                        <tr>
-                            <th>VS/VST</th>
-                            <th>VS/VST Name</th>
-                            <th>Soft Status</th>
-                            <th>Cost</th>
-                            <th>DTR (Days To Run)</th>
-                            <th>Original Template Name</th>
-                            <th>Virtual Server Type</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr *ngFor="let vs of vsList">
-                            <td class="vs-id-cell">VS{{ vs.id }}</td>
-                            <td class="vs-name-cell">
-                                <a [routerLink]="['/vs', vs.folderName]" class="vs-link">
-                                    {{ vs.name || 'Unnamed VS' }}
-                                </a>
-                            </td>
-                            <td>
-                                <span class="status-badge" [class]="getStatusClass(vs)">
-                                    {{ getStatusLabel(vs) }}
-                                </span>
-                            </td>
-                            <td class="cost-cell">
+            <!-- Grid de cards (estilo semelhante aos VST) -->
+            <div *ngIf="!isLoading && vsList.length > 0" class="vs-grid">
+                <div *ngFor="let vs of vsList" class="vs-card" (click)="goToDetails(vs.folderName)">
+                    <div class="vs-card-header">
+                        <h3>{{ vs.name || 'Unnamed VS' }}</h3>
+                        <span class="vs-id">VS{{ vs.id }}</span>
+                    </div>
+                    
+                    <div class="vs-details">
+                        <div class="vs-status">
+                            <span class="label">Status:</span>
+                            <span class="status-badge" [class]="getStatusClass(vs)">
+                                {{ getStatusLabel(vs) }}
+                            </span>
+                        </div>
+                        <div class="vs-cost">
+                            <span class="label">Cost:</span>
+                            <span class="value cost-value">
                                 {{ vs.cost }}
                                 <span *ngIf="vs.host" class="running-multiplier">(x2 running)</span>
-                            </td>
-                            <td class="dtr-cell" [class.low-dtr]="vs.dtr < 5">
-                                {{ vs.dtr }}
-                            </td>
-                            <td class="template-cell">
-                                {{ vs.vstName || 'N/A' }}
-                            </td>
-                            <td class="type-cell">
-                                {{ getTypeDescription(vs) }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </span>
+                        </div>
+                        <div class="vs-dtr">
+                            <span class="label">DTR:</span>
+                            <span class="value" [class.low-dtr]="vs.dtr < 5">{{ vs.dtr }} days left</span>
+                        </div>
+                        <div class="vs-type">
+                            <span class="label">Type:</span>
+                            <span class="value">{{ getTypeDescription(vs) }}</span>
+                        </div>
+                        <div class="vs-template">
+                            <span class="label">Template:</span>
+                            <span class="value template-name">{{ vs.vstName || 'N/A' }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="vs-card-footer">
+                        <button class="details-btn">View Details</button>
+                    </div>
+                </div>
             </div>
         </div>
     `,
     styles: [`
         .vs-list-container {
             padding: 20px;
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
         }
         
@@ -91,25 +86,6 @@ import { VirtualServer } from '../models/vs.model';
         .header h2 {
             margin: 0;
             color: #333;
-        }
-        
-        .refresh-btn button {
-            padding: 8px 16px;
-            background: #6c757d;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        
-        .refresh-btn button:hover:not(:disabled) {
-            background: #5a6268;
-        }
-        
-        .refresh-btn button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
         }
         
         .loading {
@@ -140,61 +116,90 @@ import { VirtualServer } from '../models/vs.model';
             color: #666;
         }
         
-        .vs-table-container {
-            overflow-x: auto;
+        .vs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 24px;
         }
         
-        .vs-table {
-            width: 100%;
-            border-collapse: collapse;
+        .vs-card {
             background: white;
-            border-radius: 8px;
-            overflow: hidden;
+            border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        
-        .vs-table thead tr {
-            background: #2c3e50;
-            color: white;
-        }
-        
-        .vs-table th {
-            padding: 12px 16px;
-            text-align: left;
-            font-weight: 500;
-        }
-        
-        .vs-table td {
-            padding: 12px 16px;
-            border-bottom: 1px solid #e9ecef;
-            vertical-align: middle;
-        }
-        
-        .vs-table tbody tr:hover {
-            background: #f8f9fa;
-        }
-        
-        .vs-id-cell {
-            font-weight: 500;
-            color: #6c757d;
-        }
-        
-        .vs-name-cell .vs-link {
-            color: #007bff;
-            text-decoration: none;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
             cursor: pointer;
         }
         
-        .vs-name-cell .vs-link:hover {
-            text-decoration: underline;
+        .vs-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+        
+        .vs-card-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+        }
+        
+        .vs-card-header h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.2rem;
+        }
+        
+        .vs-id {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        
+        .vs-details {
+            padding: 16px 20px;
+        }
+        
+        .vs-details div {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .vs-details div:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        
+        .label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .value {
+            color: #333;
+        }
+        
+        .cost-value {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .running-multiplier {
+            font-size: 0.7rem;
+            color: #e67e22;
+            margin-left: 4px;
+        }
+        
+        .low-dtr {
+            color: #dc3545;
+            font-weight: bold;
         }
         
         .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
             font-weight: 500;
-            display: inline-block;
         }
         
         .status-badge.running {
@@ -212,64 +217,31 @@ import { VirtualServer } from '../models/vs.model';
             color: #856404;
         }
         
-        .status-badge.error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .cost-cell {
-            font-weight: 500;
-        }
-        
-        .running-multiplier {
-            font-size: 0.7rem;
-            color: #e67e22;
-            margin-left: 4px;
-        }
-        
-        .dtr-cell {
-            font-weight: 500;
-        }
-        
-        .dtr-cell.low-dtr {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        
-        .template-cell {
-            color: #555;
-            max-width: 200px;
+        .template-name {
+            max-width: 180px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         
-        .type-cell {
-            color: #555;
+        .vs-card-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #e9ecef;
+            text-align: right;
         }
         
-        .debug-info {
-            margin-top: 20px;
-            padding: 10px;
-            background: #f0f0f0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 12px;
+        .details-btn {
+            padding: 6px 16px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
         }
         
-        .debug-raw {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #ddd;
-        }
-        
-        .debug-raw pre {
-            background: #e0e0e0;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-            font-size: 10px;
-            margin: 5px 0 0 0;
+        .details-btn:hover {
+            background: #5a6268;
         }
         
         @media (max-width: 768px) {
@@ -277,74 +249,71 @@ import { VirtualServer } from '../models/vs.model';
                 padding: 16px;
             }
             
-            .vs-table th, .vs-table td {
-                padding: 8px 12px;
-                font-size: 12px;
-            }
-            
-            .template-cell, .type-cell {
-                max-width: 120px;
+            .vs-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
             }
         }
     `]
 })
-export class VSListComponent implements OnInit {
+export class VSListComponent implements OnInit, OnDestroy {
     vsList: VirtualServer[] = [];
     isLoading = true;
-    errorMessage: string = '';
+    private pollingSubscription: Subscription | null = null;
+    private readonly POLLING_INTERVAL = 5000; // 5 segundos
     
     constructor(
         private vsService: VSService,
+        private creditService: CreditService,
         private cdr: ChangeDetectorRef,
         private router: Router
-    ) {
-        this.router.events.subscribe(event => {
-        if (event instanceof NavigationEnd && event.url === '/vs') {
-            this.loadVSList();
-        }
-    });
-}
+    ) {}
     
     ngOnInit(): void {
         this.loadVSList();
+        this.startPolling();
     }
     
-    loadVSList(): void {
-        console.log('Loading VS list...');
-        this.isLoading = true;
+    ngOnDestroy(): void {
+        this.stopPolling();
+    }
+    
+    startPolling(): void {
+        this.pollingSubscription = interval(this.POLLING_INTERVAL).subscribe(() => {
+            this.loadVSList(false); // Silencioso, sem mostrar loading
+        });
+    }
+    
+    stopPolling(): void {
+        if (this.pollingSubscription) {
+            this.pollingSubscription.unsubscribe();
+            this.pollingSubscription = null;
+        }
+    }
+    
+    loadVSList(showLoading: boolean = true): void {
+        if (showLoading) {
+            this.isLoading = true;
+        }
         
         this.vsService.getUserVSList().subscribe({
             next: (response) => {
-                console.log('Response received:', response);
                 if (response.success && response.data) {
                     this.vsList = response.data;
-                    console.log('vsList updated:', this.vsList);
-                    
-                    // Debug: mostrar o primeiro VS em detalhe
-                    if (this.vsList.length > 0) {
-                        console.log('First VS details:', {
-                            id: this.vsList[0].id,
-                            name: this.vsList[0].name,
-                            vstName: this.vsList[0].vstName,
-                            type: this.vsList[0].type,
-                            typeDescription: this.vsList[0].typeDescription
-                        });
-                    }
                 }
                 this.isLoading = false;
                 this.cdr.detectChanges();
             },
             error: (error) => {
                 console.error('Error loading VS list:', error);
-                this.errorMessage = 'Failed to load virtual servers. Please try again.';
                 this.isLoading = false;
                 this.cdr.detectChanges();
             }
         });
     }
     
-    refreshList(): void {
-        this.loadVSList();
+    goToDetails(folderName: string): void {
+        this.router.navigate(['/vs', folderName]);
     }
     
     getStatusClass(vs: VirtualServer): string {
@@ -360,12 +329,9 @@ export class VSListComponent implements OnInit {
     }
     
     getTypeDescription(vs: VirtualServer): string {
-        // Se o backend já retornar no formato correto, usar diretamente
         if (vs.typeDescription && vs.typeDescription.includes(' - ')) {
             return vs.typeDescription;
         }
-        
-        // Fallback caso o backend não retorne o formato esperado
         const typeMap: { [key: number]: string } = {
             0: '0 - Fake/Testing',
             1: '1 - QEMU/KVM',
@@ -380,12 +346,6 @@ export class VSListComponent implements OnInit {
             10: '10 - PODMAN',
             11: '11 - INCUS'
         };
-        
-        if (typeMap[vs.type]) {
-            return typeMap[vs.type];
-        }
-        
-        // Se o tipo não estiver no mapa, usar a descrição do backend ou fallback
-        return vs.typeDescription || `Type ${vs.type}`;
+        return typeMap[vs.type] || vs.typeDescription || `Type ${vs.type}`;
     }
 }

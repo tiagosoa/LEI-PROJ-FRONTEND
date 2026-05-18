@@ -5,6 +5,7 @@ import { VSService } from '../services/vs.service';
 import { CreditService } from '../services/credit.service';
 import { VirtualServer, CustomAccess } from '../models/vs.model';
 import { FormsModule } from '@angular/forms';
+import { Subscription, interval } from 'rxjs';
 
 @Component({
     selector: 'app-vs-details',
@@ -49,14 +50,6 @@ import { FormsModule } from '@angular/forms';
                         <span class="value" [class.running]="vs.hardStatus === 'running'">
                             {{ vs.hardStatus ? (vs.hardStatus | uppercase) : 'Unknown' }}
                         </span>
-                    </div>
-                    <div class="status-item" *ngIf="vs.host">
-                        <span class="label">Running on Node:</span>
-                        <span class="value">{{ vs.host }}</span>
-                    </div>
-                    <div class="status-item" *ngIf="vs.fixedHost">
-                        <span class="label">Fixed Host:</span>
-                        <span class="value">{{ vs.fixedHost }}</span>
                     </div>
                 </div>
             </div>
@@ -151,7 +144,7 @@ import { FormsModule } from '@angular/forms';
                 <div class="access-list">
                     <div class="access-item" *ngFor="let access of vs.customAccesses">
                         <div class="access-header">
-                            <span class="access-title">Access #{{ access.id }}</span>
+                            <!-- REMOVER "Access #{{ access.id }}" -->
                             <div class="access-controls">
                                 <button class="toggle-btn" 
                                         [class.enabled]="access.enabled" 
@@ -160,6 +153,9 @@ import { FormsModule } from '@angular/forms';
                                         [disabled]="isTogglingAccess[access.id]">
                                     {{ isTogglingAccess[access.id] ? 'Updating...' : (access.enabled ? 'Disable' : 'Enable') }}
                                 </button>
+                                <span class="access-status" [class.enabled]="access.enabled" [class.disabled]="!access.enabled">
+                                    {{ access.enabled ? 'Enabled' : 'Disabled' }}
+                                </span>
                             </div>
                         </div>
                         <div class="access-description" [innerHTML]="cleanAccessDescription(access.description)"></div>
@@ -898,6 +894,8 @@ export class VSDetailsComponent implements OnInit {
     confirmPassword: string = '';
     isTogglingAccess: { [key: number]: boolean } = {}; 
     isResettingDTR: boolean = false; 
+    private pollingSubscription: Subscription | null = null;
+    private readonly POLLING_INTERVAL = 5000; 
     
     constructor(
         private route: ActivatedRoute,
@@ -914,6 +912,7 @@ export class VSDetailsComponent implements OnInit {
             console.log('Folder name from route:', folderName);
             if (folderName) {
                 this.loadVSDetails(folderName);
+                this.startPolling();
             } else {
                 console.error('No folderName in route params');
                 this.errorMessage = 'No virtual server specified';
@@ -922,18 +921,21 @@ export class VSDetailsComponent implements OnInit {
             }
         });
     }
+
+    ngOnDestroy(): void {
+        this.stopPolling();
+    }
     
-    loadVSDetails(folderName: string): void {
-        this.isLoading = true;
-        this.cdr.detectChanges();
+    loadVSDetails(folderName: string, showLoading: boolean = true): void {
+        if (showLoading) {
+            this.isLoading = true;
+            this.cdr.detectChanges();
+        }
 
         this.vsService.getVSDetails(folderName).subscribe({
             next: (response) => {
                 if (response.success && response.data) {
                     this.vs = response.data;
-                } else {
-                    // VS não encontrado
-                    this.handleNotFound();
                 }
                 this.isLoading = false;
                 this.cdr.detectChanges();
@@ -944,6 +946,7 @@ export class VSDetailsComponent implements OnInit {
             }
         });
     }
+    
     getTypeDisplay(vs: VirtualServer): string {
         if (vs.typeDescription && vs.typeDescription.includes(' - ')) {
             return vs.typeDescription;
@@ -1284,14 +1287,13 @@ export class VSDetailsComponent implements OnInit {
         
         this.vsService.toggleAccessEnabled(this.vs.folderName, accessId, enabled).subscribe({
             next: () => {
-                // Recarregar os detalhes completos do VS para obter o estado atualizado
                 this.loadVSDetails(this.vs!.folderName);
-                
+
                 this.isTogglingAccess[accessId] = false;
                 this.actionMessage = `Access ${action}d successfully!`;
                 this.isError = false;
                 this.cdr.detectChanges();
-                
+
                 setTimeout(() => {
                     this.actionMessage = '';
                     this.cdr.detectChanges();
@@ -1303,7 +1305,7 @@ export class VSDetailsComponent implements OnInit {
                 this.isError = true;
                 this.isTogglingAccess[accessId] = false;
                 this.cdr.detectChanges();
-                
+
                 setTimeout(() => {
                     this.actionMessage = '';
                     this.cdr.detectChanges();
@@ -1328,58 +1330,73 @@ export class VSDetailsComponent implements OnInit {
         return cleaned || description;
     }
     
-/**
- * Reseta o DTR (Days To Run) para 30 dias
- */
-resetDTR(): void {
-    if (!this.vs) return;
-    
-    // Verificar se o VS está parado
-    if (this.vs.softStatus !== 'stopped') {
-        alert('Cannot reset DTR. Virtual server must be stopped first.');
-        return;
-    }
-    
-    const confirmReset = confirm(`Reset Days to Run (DTR) for "${this.vs.name}" from ${this.vs.dtr} days to 30 days?`);
-    
-    if (!confirmReset) return;
-    
-    this.isResettingDTR = true;
-    this.actionMessage = '';
-    this.isError = false;
-    this.cdr.detectChanges();
-    
-    this.vsService.resetDTR(this.vs.folderName).subscribe({
-        next: (response) => {
-            if (this.vs && response.data?.newDTR) {
-                this.vs.dtr = response.data.newDTR;
-            }
-            
-            this.actionMessage = response.message || 'DTR reset successfully!';
-            this.isError = false;
-            this.isResettingDTR = false;
-            this.cdr.detectChanges();
-            
-            setTimeout(() => {
-                this.loadVSDetails(this.vs!.folderName);
-            }, 1000);
-            
-            setTimeout(() => {
-                this.actionMessage = '';
-                this.cdr.detectChanges();
-            }, 3000);
-        },
-        error: (error) => {
-            console.error('Error resetting DTR:', error);
-            this.actionMessage = error.error?.error || 'Failed to reset DTR';
-            this.isError = true;
-            this.isResettingDTR = false;
-            this.cdr.detectChanges();
-            setTimeout(() => {
-                this.actionMessage = '';
-                this.cdr.detectChanges();
-            }, 5000);
+    /**
+     * Reseta o DTR (Days To Run) para 30 dias
+     */
+    resetDTR(): void {
+        if (!this.vs) return;
+
+        // Verificar se o VS está parado
+        if (this.vs.softStatus !== 'stopped') {
+            alert('Cannot reset DTR. Virtual server must be stopped first.');
+            return;
         }
-    });
+
+        const confirmReset = confirm(`Reset Days to Run (DTR) for "${this.vs.name}" from ${this.vs.dtr} days to 30 days?`);
+
+        if (!confirmReset) return;
+
+        this.isResettingDTR = true;
+        this.actionMessage = '';
+        this.isError = false;
+        this.cdr.detectChanges();
+
+        this.vsService.resetDTR(this.vs.folderName).subscribe({
+            next: (response) => {
+                if (this.vs && response.data?.newDTR) {
+                    this.vs.dtr = response.data.newDTR;
+                }
+
+                this.actionMessage = response.message || 'DTR reset successfully!';
+                this.isError = false;
+                this.isResettingDTR = false;
+                this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.loadVSDetails(this.vs!.folderName);
+                }, 1000);
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 3000);
+            },
+            error: (error) => {
+                console.error('Error resetting DTR:', error);
+                this.actionMessage = error.error?.error || 'Failed to reset DTR';
+                this.isError = true;
+                this.isResettingDTR = false;
+                this.cdr.detectChanges();
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 5000);
+            }
+        });
+    }
+
+    startPolling(): void {
+        this.pollingSubscription = interval(this.POLLING_INTERVAL).subscribe(() => {
+            if (this.vs) {
+                this.loadVSDetails(this.vs.folderName, false);
+            }
+        });
+    }
+
+    stopPolling(): void {
+        if (this.pollingSubscription) {
+            this.pollingSubscription.unsubscribe();
+            this.pollingSubscription = null;
+        }
     }
 }
