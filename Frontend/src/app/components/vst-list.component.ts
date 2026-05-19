@@ -5,6 +5,7 @@ import { VSTService } from '../services/vst.service';
 import { VirtualServerTemplate } from '../models/vst.model';
 import { CreditService } from '../services/credit.service';
 import { VSService } from '../services/vs.service';
+import { Subscription, interval } from 'rxjs';
 
 @Component({
     selector: 'app-vst-list',
@@ -14,11 +15,6 @@ import { VSService } from '../services/vs.service';
         <div class="vst-list-container">
             <div class="header">
                 <h2>Available Virtual Server Templates</h2>
-                <div class="refresh-btn">
-                    <button (click)="refreshList()" [disabled]="isLoading">
-                        Refresh
-                    </button>
-                </div>
             </div>
             
             <div *ngIf="isLoading" class="loading">
@@ -401,6 +397,8 @@ export class VSTListComponent implements OnInit {
     isLoading = true;
     selectedVST: VirtualServerTemplate | null = null;
     creatingVS: boolean = false;
+    private pollingSubscription: Subscription | null = null;
+    private readonly POLLING_INTERVAL = 30000;
     
     constructor(
     private vstService: VSTService,
@@ -411,17 +409,23 @@ export class VSTListComponent implements OnInit {
     ) {}
     
     ngOnInit(): void {
-        this.loadVSTList();
+        this.loadVSTList();        
+        this.startPolling();
     }
     
-    loadVSTList(): void {
-        this.isLoading = true;
+    ngOnDestroy(): void {
+        this.stopPolling();
+    }
+    
+    loadVSTList(showLoading: boolean = true): void {
+        if (showLoading) {
+            this.isLoading = true;
+        }
         
         this.vstService.getAvailableVSTs().subscribe({
             next: (response) => {
                 if (response.success && response.data) {
                     this.vstList = response.data;
-                    console.log('VSTs loaded:', this.vstList.length);
                 }
                 this.isLoading = false;
                 this.cdr.detectChanges();
@@ -476,6 +480,19 @@ export class VSTListComponent implements OnInit {
                     this.cdr.detectChanges();
                 }
             });
+        }
+    }
+
+    startPolling(): void {
+        this.pollingSubscription = interval(this.POLLING_INTERVAL).subscribe(() => {
+            this.loadVSTList(false);
+        });
+    }
+
+    stopPolling(): void {
+        if (this.pollingSubscription) {
+            this.pollingSubscription.unsubscribe();
+            this.pollingSubscription = null;
         }
     }
 }

@@ -12,7 +12,6 @@ export const routes: Routes = [
     { path: 'vs', component: VSListComponent, canActivate: [AuthGuard] },
     { path: 'vs/:folderName', component: VSDetailsComponent, canActivate: [AuthGuard, VSExistsGuard] },
     { path: 'templates', component: VSTListComponent, canActivate: [AuthGuard] },
-    { path: 'dashboard', component: DashboardComponent, canActivate: [AuthGuard] },
-    { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
-    { path: '**', redirectTo: '/dashboard' }
+    { path: '', redirectTo: '/vs', pathMatch: 'full' },
+    { path: '**', redirectTo: '/vs' }
 ];

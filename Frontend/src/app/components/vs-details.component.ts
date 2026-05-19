@@ -14,7 +14,6 @@ import { Subscription, interval } from 'rxjs';
     template: `
         <div class="details-container" *ngIf="!isLoading && vs; else loading">
             <div class="details-header">
-                <button class="back-btn" (click)="goBack()">Back to VS List</button>
                 <h1>{{ vs.name || 'Virtual Server' }}</h1>
                 <div class="action-buttons">
                     <button class="action-btn start" 
@@ -81,8 +80,11 @@ import { Subscription, interval } from 'rxjs';
                         <span class="label">Days to Run (DTR):</span>
                         <span class="value" [class.low]="vs.dtr < 5">
                             {{ vs.dtr }} days remaining
-                            <button class="reset-dtr-btn" (click)="resetDTR()" [disabled]="isResettingDTR">
-                                {{ isResettingDTR ? 'Resetting...' : 'Reset to 30 days' }}
+                            <button *ngIf="vs.softStatus === 'running' && vs.dtr < 30" 
+                                    class="reset-dtr-btn" 
+                                    (click)="resetDTR()" 
+                                    [disabled]="isResettingDTR">
+                                {{ isResettingDTR ? 'Resetting...' : 'Reset to 30' }}
                             </button>
                         </span>
                     </div>
@@ -139,7 +141,7 @@ import { Subscription, interval } from 'rxjs';
             </div>
             
             <!-- Custom Access Section -->
-            <div class="info-card" *ngIf="vs.customAccesses && vs.customAccesses.length > 0">
+            <div class="info-card" *ngIf="vs.customAccesses && vs.customAccesses.length > 0 && vs.softStatus === 'running'">
                 <h3>Access Methods</h3>
                 <div class="access-list">
                     <div class="access-item" *ngFor="let access of vs.customAccesses">
@@ -211,16 +213,6 @@ import { Subscription, interval } from 'rxjs';
                         </button>
                         <button class="cancel-btn" (click)="closePasswordModal()">Cancel</button>
                     </div>
-                </div>
-            </div>
-            
-            <!-- Requirements Section -->
-            <div class="info-card" *ngIf="vs.requisites && vs.requisites.length > 0">
-                <h3>Node Requirements</h3>
-                <div class="requisites-list">
-                    <span class="requisite-tag" *ngFor="let req of vs.requisites">
-                        {{ req }}
-                    </span>
                 </div>
             </div>
         </div>
@@ -748,6 +740,20 @@ styles: [`
 
     .cancel-btn:hover {
         background: #5a6268;
+    }
+
+    .reset-dtr-btn {
+        margin-left: 10px;
+        padding: 2px 8px;
+        background: #ffc107;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.7rem;
+    }
+
+    .reset-dtr-btn:hover:not(:disabled) {
+        background: #e0a800;
     }
 
     .modal-overlay {
@@ -1335,59 +1341,27 @@ export class VSDetailsComponent implements OnInit {
      */
     resetDTR(): void {
         if (!this.vs) return;
-
-        // Verificar se o VS está parado
-        if (this.vs.softStatus !== 'stopped') {
-            alert('Cannot reset DTR. Virtual server must be stopped first.');
-            return;
-        }
-
-        const confirmReset = confirm(`Reset Days to Run (DTR) for "${this.vs.name}" from ${this.vs.dtr} days to 30 days?`);
-
-        if (!confirmReset) return;
-
+        
         this.isResettingDTR = true;
-        this.actionMessage = '';
-        this.isError = false;
-        this.cdr.detectChanges();
-
-        this.vsService.resetDTR(this.vs.folderName).subscribe({
-            next: (response) => {
-                if (this.vs && response.data?.newDTR) {
-                    this.vs.dtr = response.data.newDTR;
-                }
-
-                this.actionMessage = response.message || 'DTR reset successfully!';
-                this.isError = false;
+        this.vsService.setAttribute(this.vs.folderName, 'VS_DTR', '30').subscribe({
+            next: () => {
+                this.vs!.dtr = 30;
                 this.isResettingDTR = false;
+                this.actionMessage = 'DTR reset to 30 days successfully!';
                 this.cdr.detectChanges();
-
-                setTimeout(() => {
-                    this.loadVSDetails(this.vs!.folderName);
-                }, 1000);
-
-                setTimeout(() => {
-                    this.actionMessage = '';
-                    this.cdr.detectChanges();
-                }, 3000);
+                setTimeout(() => this.actionMessage = '', 3000);
             },
             error: (error) => {
-                console.error('Error resetting DTR:', error);
-                this.actionMessage = error.error?.error || 'Failed to reset DTR';
-                this.isError = true;
+                this.actionMessage = 'Failed to reset DTR';
                 this.isResettingDTR = false;
                 this.cdr.detectChanges();
-                setTimeout(() => {
-                    this.actionMessage = '';
-                    this.cdr.detectChanges();
-                }, 5000);
             }
         });
     }
 
     startPolling(): void {
         this.pollingSubscription = interval(this.POLLING_INTERVAL).subscribe(() => {
-            if (this.vs) {
+            if (this.vs && this.vs.folderName) {
                 this.loadVSDetails(this.vs.folderName, false);
             }
         });

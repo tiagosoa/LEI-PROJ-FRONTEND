@@ -1,9 +1,9 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
-import { RouterModule, RouterOutlet, NavigationEnd, Router } from '@angular/router';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { RouterModule, RouterOutlet, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
 import { CreditService } from './services/credit.service';
-import { Subscription, filter } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { CreditInfo } from './models/credit.model';
 
 @Component({
@@ -14,26 +14,24 @@ import { CreditInfo } from './models/credit.model';
         <div class="app-container" *ngIf="(authService.currentUser$ | async) as user; else login">
             <div class="app-header">
                 <div class="header-left">
-                    <h1>DEI Private Cloud</h1>
+                    <h1>DEI Virtual Servers Private Cloud</h1>
                 </div>
                 <div class="header-right">
-                    <div class="dashboard-link">
-                        <button routerLink="/dashboard">Dashboard</button>
-                    </div> 
                     <div class="credit-info" *ngIf="credit">
                         <span class="credit-label">Used credit:</span>
                         <span class="credit-value" [class.warning]="isLowCredit()">
                             {{ credit.used }} / {{ credit.total }}
                         </span>
-                    </div>   
-                    <div class="credit-info" *ngIf="!credit && isLoadingCredit">
-                        <span class="credit-label">Loading credit...</span>
                     </div>
                     <div class="user-info">
                         <span>Welcome, {{ user.username }}</span>
                         <button (click)="logout()">Logout</button>
                     </div>
                 </div>
+            </div>
+            <div class="nav-menu">
+                <a routerLink="/vs" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">My Virtual Servers</a>
+                <a routerLink="/templates" routerLinkActive="active">Templates</a>
             </div>
             <div class="app-content">
                 <router-outlet></router-outlet>
@@ -58,7 +56,7 @@ import { CreditInfo } from './models/credit.model';
         
         .header-left h1 {
             margin: 0;
-            font-size: 1.5rem;
+            font-size: 1.3rem;
         }
         
         .header-right {
@@ -86,21 +84,6 @@ import { CreditInfo } from './models/credit.model';
         .credit-value.warning {
             color: #ffc107;
         }
-
-        .dashboard-link {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        
-        .dashboard-link button {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
         
         .user-info {
             display: flex;
@@ -121,6 +104,29 @@ import { CreditInfo } from './models/credit.model';
             background: rgba(255, 255, 255, 0.3);
         }
         
+        .nav-menu {
+            background: #34495e;
+            padding: 0 20px;
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-menu a {
+            color: white;
+            text-decoration: none;
+            padding: 12px 16px;
+            transition: background 0.2s;
+        }
+        
+        .nav-menu a:hover {
+            background: #3d566e;
+        }
+        
+        .nav-menu a.active {
+            background: #1abc9c;
+            color: white;
+        }
+        
         .app-content {
             padding: 20px;
         }
@@ -134,47 +140,34 @@ import { CreditInfo } from './models/credit.model';
             .header-right {
                 justify-content: center;
             }
+            
+            .nav-menu {
+                justify-content: center;
+            }
         }
     `]
 })
 export class AppComponent implements OnInit, OnDestroy {
     credit: CreditInfo | null = null;
-    isLoadingCredit: boolean = false;
     private creditSubscription: Subscription | null = null;
-    private userSubscription: Subscription | null = null;
-    private routerSubscription: Subscription | null = null;
     
     constructor(
         public authService: AuthService,
         private creditService: CreditService,
-        private cdr: ChangeDetectorRef,
         private router: Router
     ) {}
     
     ngOnInit(): void {
-        // Subscrever mudanças no crédito
         this.creditSubscription = this.creditService.credit$.subscribe(credit => {
             this.credit = credit;
-            this.isLoadingCredit = false;
-            this.cdr.detectChanges(); 
         });
         
-        // Subscrever mudanças no utilizador autenticado
-        this.userSubscription = this.authService.currentUser$.subscribe(user => {
+        this.authService.currentUser$.subscribe(user => {
             if (user) {
-                this.loadCredit();
-            } else {
-                this.credit = null;
-                this.cdr.detectChanges();
-            }
-        });
-        
-        // Recarregar crédito sempre que a navegação muda (refresh de página)
-        this.routerSubscription = this.router.events.pipe(
-            filter(event => event instanceof NavigationEnd)
-        ).subscribe(() => {
-            if (this.authService.isAuthenticated()) {
-                this.loadCredit();
+                this.creditService.getCredit().subscribe();
+                if (this.router.url === '/' || this.router.url === '/dashboard') {
+                    this.router.navigate(['/vs']);
+                }
             }
         });
     }
@@ -183,29 +176,6 @@ export class AppComponent implements OnInit, OnDestroy {
         if (this.creditSubscription) {
             this.creditSubscription.unsubscribe();
         }
-        if (this.userSubscription) {
-            this.userSubscription.unsubscribe();
-        }
-        if (this.routerSubscription) {
-            this.routerSubscription.unsubscribe();
-        }
-    }
-    
-    loadCredit(): void {
-        this.isLoadingCredit = true;
-        this.cdr.detectChanges();
-        
-        this.creditService.getCredit().subscribe({
-            next: () => {
-                // O crédito será atualizado pelo subscription do credit$
-                console.log('Credit loaded successfully');
-            },
-            error: (error) => {
-                console.error('Error loading credit:', error);
-                this.isLoadingCredit = false;
-                this.cdr.detectChanges();
-            }
-        });
     }
     
     isLowCredit(): boolean {
@@ -216,8 +186,6 @@ export class AppComponent implements OnInit, OnDestroy {
     
     logout(): void {
         this.authService.logout();
-        this.credit = null;
-        this.cdr.detectChanges();
         window.location.href = '/login';
     }
 }

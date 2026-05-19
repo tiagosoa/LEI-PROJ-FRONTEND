@@ -11,7 +11,7 @@ import { AuthService } from '../services/auth.service';
     template: `
         <div class="login-container">
             <div class="login-card">
-                <h2>DEI Private Cloud</h2>
+                <h2>DEI Virtual Servers Private Cloud</h2>
                 <p class="subtitle">Login</p>
                 
                 <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
