@@ -96,16 +96,17 @@ async function getCustomAccesses(vsFolder) {
             const password = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_PASS`);
             let enabledDisabled = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_ENABLED_DISABLED`);
             const passChange = await getAttribute(vsFolder, `CUSTOM_ACCESS${i}_PASS_CHANGE`);
+            const canToggle = !!(enabledDisabled && enabledDisabled.trim() !== '');
             
-            // Limpar a descrição - remover indicações de ENABLED/DISABLED
             desc = desc.replace(/\s*\(?(ENABLED|DISABLED)\)?\s*/gi, '');
             desc = desc.replace(/\s*-\s*(ENABLED|DISABLED)\s*/gi, '');
+            desc = desc.replace(/\s*\[(ENABLED|DISABLED)\]\s*/gi, '');
             desc = desc.trim();
             
             if (!desc) {
                 desc = `Access #${i}`;
             }
-            
+        
             let enabled = true;
             if (enabledDisabled && enabledDisabled.trim() !== '') {
                 enabled = enabledDisabled.trim().toLowerCase() === 'enabled';
@@ -116,6 +117,7 @@ async function getCustomAccesses(vsFolder) {
                 description: desc,
                 password: password || null,
                 enabled: enabled,
+                canToggle: canToggle,
                 canChangePassword: !!(passChange && passChange.trim() !== ''),
                 changeDescription: passChange || null
             });
@@ -158,29 +160,23 @@ async function getNetworkConfig(vsFolder) {
 async function getVSDetails(vsFolder, extended = false) {
     const folderInfo = parseFolderName(vsFolder);
     const isVST = folderInfo.prefix === 'VST';
-    
-    // Atributos base
     const baseAttributes = isVST 
     ? ['VST_NAME', 'VST_DESC', 'VS_STATUS', 'VST_COST', 'VS_HOST', 'VS_DTR', 'VST_DISABLED']
     : ['VS_NAME', 'VS_DESC', 'VS_STATUS', 'VST_COST', 'VS_HOST', 'VS_DTR', 'VST_NAME', 'VST_DESC'];  
 
     
     const attrValues = await getMultipleAttributes(vsFolder, baseAttributes);
-    
-    // Hard status - executar isRunning no nó correto
     let hardStatus = null;
     const vsHost = attrValues.VS_HOST ? attrValues.VS_HOST.trim() : null;
     
     if (vsHost && vsHost !== '') {
         try {
-            // Executar isRunning remotamente no nó onde o VS está a correr
             const remoteCommand = `/ctl/runRemote ${vsHost} ${vsFolder} isRunning`;
             console.log(`Getting hard status from node ${vsHost} for ${vsFolder}`);
             const output = await runLocalCommand(remoteCommand);
             hardStatus = output.trim();
         } catch (error) {
             console.error(`Error getting hard status from ${vsHost}:`, error.message);
-            // Se falhar, assumir que não está a correr
             hardStatus = 'stopped';
         }
     } else {
@@ -255,6 +251,7 @@ async function getVSDetails(vsFolder, extended = false) {
  * Obtém a lista de VS do utilizador
  */
 async function getUserVS(username, extended = false) {
+    try{
     const folders = await listFolders(username);
     const vsList = [];
     
@@ -270,6 +267,11 @@ async function getUserVS(username, extended = false) {
     }
     
     return vsList;
+
+    } catch (error) {
+        console.error(`Error getting VS list for ${username}:`, error);
+        return []; 
+    }
 }
 
 /**
@@ -585,25 +587,15 @@ async function resetDTR(vsFolderName, username) {
     try {
         const vsDetails = await getVSDetails(vsFolderName, false);
         
-        if (!vsDetails) {
-            throw new Error(`VS ${vsFolderName} not found`);
-        }
-        
-        if (vsDetails.owner !== username) {
-            throw new Error(`Access denied. You do not own this virtual server.`);
-        }
-        
+        if (!vsDetails) throw new Error(`VS ${vsFolderName} not found`);
+        if (vsDetails.owner !== username) throw new Error(`Access denied`);
         const node = await getBestNodeForVS(vsFolderName);
         const command = `setInfo VS_DTR64 $(echo -n '30' | base64)`;
-        const output = await runRemoteCommandOnNode(node, vsFolderName, command);
         
-        return {
-            success: true,
-            message: 'DTR reset to 30 days successfully'
-        };
+        await runRemoteCommandOnNode(node, vsFolderName, command);
         
+        return { success: true };
     } catch (error) {
-        console.error(`Error resetting DTR for ${vsFolderName}:`, error);
         throw error;
     }
 }

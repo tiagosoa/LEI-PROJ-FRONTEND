@@ -39,6 +39,7 @@ export interface CustomAccess {
     password: string | null;
     enabled: boolean;
     canChangePassword: boolean;
+    canToggle: boolean;
     changeDescription: string | null;
     enabledDisabled?: string; 
 }

@@ -16,7 +16,7 @@ function authenticate(req, res, next) {
     
     try {
         const decoded = verifyToken(token);
-        req.user = decoded; // Adiciona dados do utilizador ao request
+        req.user = decoded;
         next();
     } catch (error) {
         return res.status(401).json({

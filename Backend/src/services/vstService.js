@@ -78,23 +78,28 @@ async function listAvailableVSTs() {
  * Lista TODOS os templates VST (admin)
  */
 async function listAllVSTs() {
-    const command = `/ctl/listFolders VSTALL`;
-    const output = await runLocalCommand(command);
-    const folders = output ? output.split('\n').filter(line => line.trim()) : [];
-    
-    const vstList = [];
-    for (const folder of folders) {
-        if (folder.startsWith('VST_')) {
-            try {
-                const vstDetails = await getVSTDetails(folder);
-                vstList.push(vstDetails);
-            } catch (error) {
-                console.error(`Error processing VST folder ${folder}:`, error);
+    try {
+        const command = `/ctl/listFolders VSTALL`;
+        const output = await runLocalCommand(command);
+        const folders = output ? output.split('\n').filter(line => line.trim()) : [];
+        
+        const vstList = [];
+        for (const folder of folders) {
+            if (folder.startsWith('VST_')) {
+                try {
+                    const vstDetails = await getVSTDetails(folder);
+                    vstList.push(vstDetails);
+                } catch (error) {
+                    console.error(`Error processing VST folder ${folder}:`, error);
+                }
             }
         }
+        
+        return vstList;
+    } catch (error) {
+        console.error('Error in listAllVSTs:', error);
+        return []; // Retornar array vazio em caso de erro
     }
-    
-    return vstList;
 }
 
 /**

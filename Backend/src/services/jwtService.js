@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'test' ? 'test-secret-key' : null);
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 
 if (!JWT_SECRET) {
@@ -48,7 +48,7 @@ function extractToken(authHeader) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return null;
     }
-    return authHeader.substring(7); // Remove 'Bearer '
+    return authHeader.substring(7).trim();
 }
 
 module.exports = {

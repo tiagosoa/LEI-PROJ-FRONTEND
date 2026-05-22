@@ -14,7 +14,10 @@ import { Subscription, interval } from 'rxjs';
     template: `
         <div class="details-container" *ngIf="!isLoading && vs; else loading">
             <div class="details-header">
-                <h1>{{ vs.name || 'Virtual Server' }}</h1>
+                <div class="title-section">
+                    <h1>{{ vs.name || 'Virtual Server' }}</h1>
+                    <span class="dns-name">DNS: vs{{ vs.id }}</span>
+                </div>
                 <div class="action-buttons">
                     <button class="action-btn start" 
                             [disabled]="vs.softStatus === 'running' || isActionInProgress" 
@@ -31,9 +34,14 @@ import { Subscription, interval } from 'rxjs';
                             (click)="deleteVS()">
                         {{ isDeleting ? 'Deleting...' : 'Delete' }}
                     </button>
+                    <button class="action-btn reset-dtr" 
+                            [disabled]="isActionInProgress || vs.dtr > 29" 
+                            (click)="resetDTR()">
+                        {{ isResettingDTR ? 'Resetting...' : 'Reset DTR' }}
+                    </button>                    
                 </div>
             </div>
-            
+
             <!-- Status Section -->
             <div class="info-card">
                 <h3>Status</h3>
@@ -52,15 +60,11 @@ import { Subscription, interval } from 'rxjs';
                     </div>
                 </div>
             </div>
-            
+
             <!-- Basic Info Section -->
             <div class="info-card">
                 <h3>Basic Information</h3>
                 <div class="info-grid">
-                    <div class="info-row">
-                        <span class="label">VS ID:</span>
-                        <span class="value">{{ vs.id }}</span>
-                    </div>
                     <div class="info-row">
                         <span class="label">Owner:</span>
                         <span class="value">{{ vs.owner }}</span>
@@ -78,15 +82,7 @@ import { Subscription, interval } from 'rxjs';
                     </div>
                     <div class="info-row">
                         <span class="label">Days to Run (DTR):</span>
-                        <span class="value" [class.low]="vs.dtr < 5">
-                            {{ vs.dtr }} days remaining
-                            <button *ngIf="vs.softStatus === 'running' && vs.dtr < 30" 
-                                    class="reset-dtr-btn" 
-                                    (click)="resetDTR()" 
-                                    [disabled]="isResettingDTR">
-                                {{ isResettingDTR ? 'Resetting...' : 'Reset to 30' }}
-                            </button>
-                        </span>
+                        <span class="value" [class.low]="vs.dtr < 5">{{ vs.dtr }} days remaining</span>
                     </div>
                     <div class="info-row">
                         <span class="label">Name:</span>
@@ -106,14 +102,55 @@ import { Subscription, interval } from 'rxjs';
                 </div>
             </div>
 
-            <!-- Description Section-->
+            <!-- Custom Access Section -->
+            <div class="info-card" *ngIf="vs.customAccesses && vs.customAccesses.length > 0">
+                <h3>Access Methods</h3>
+                <div class="access-list">
+                    <div class="access-item" *ngFor="let access of vs.customAccesses">
+                        <div class="access-header">
+                            <div class="access-controls">
+                                <button *ngIf="access.canToggle" 
+                                        class="toggle-btn" 
+                                        [class.enabled]="access.enabled" 
+                                        [class.disabled]="!access.enabled"
+                                        (click)="toggleAccess(access.id, !access.enabled)"
+                                        [disabled]="isTogglingAccess[access.id]">
+                                    {{ isTogglingAccess[access.id] ? 'Updating...' : (access.enabled ? 'Disable' : 'Enable') }}
+                                </button>
+                                <span class="access-status" [class.enabled]="access.enabled" [class.disabled]="!access.enabled">
+                                    {{ access.enabled ? 'Enabled' : 'Disabled' }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="access-description" [innerHTML]="access.description"></div>
+                        <div class="access-password" *ngIf="access.password && access.enabled">
+                            <span class="label">Password:</span>
+                            <div class="password-field">
+                                <input [type]="showPassword[access.id] ? 'text' : 'password'" 
+                                       [value]="access.password" 
+                                       readonly
+                                       #passwordInput>
+                                <button (click)="togglePassword(access.id, passwordInput)">{{ showPassword[access.id] ? 'Hide' : 'Show' }}</button>
+                                <button (click)="copyPassword(access.password)">Copy</button>
+                            </div>
+                        </div>
+                        <div class="access-action" *ngIf="access.canChangePassword && access.enabled">
+                            <button class="change-pass-btn" (click)="openPasswordModal(access.id)">
+                                 {{ access.changeDescription || 'Change Password' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description Section -->
             <div class="info-card">
                 <h3>Description</h3>
                 <div class="description-container">
                     <div class="description-column">
                         <div class="description-header">
                             <strong>VS Description (editable)</strong>
-                            <button *ngIf="!isEditingDescription" class="edit-icon-small" (click)="startEditDescription()">✏️ Edit</button>
+                            <button *ngIf="!isEditingDescription" class="edit-icon-small" (click)="startEditDescription()">Edit</button>
                         </div>
                         <div *ngIf="!isEditingDescription" class="description-content">
                             {{ vs.description || 'No description provided.' }}
@@ -131,7 +168,7 @@ import { Subscription, interval } from 'rxjs';
                     </div>
                     <div class="description-column">
                         <div class="description-header">
-                            <strong>Original Template Description (read-only)</strong>
+                            <strong>Original Template Description</strong>
                         </div>
                         <div class="description-content read-only">
                             {{ vs.vstDescription || 'No template description available.' }}
@@ -139,62 +176,8 @@ import { Subscription, interval } from 'rxjs';
                     </div>
                 </div>
             </div>
-            
-            <!-- Custom Access Section -->
-            <div class="info-card" *ngIf="vs.customAccesses && vs.customAccesses.length > 0 && vs.softStatus === 'running'">
-                <h3>Access Methods</h3>
-                <div class="access-list">
-                    <div class="access-item" *ngFor="let access of vs.customAccesses">
-                        <div class="access-header">
-                            <!-- REMOVER "Access #{{ access.id }}" -->
-                            <div class="access-controls">
-                                <button class="toggle-btn" 
-                                        [class.enabled]="access.enabled" 
-                                        [class.disabled]="!access.enabled"
-                                        (click)="toggleAccess(access.id, !access.enabled)"
-                                        [disabled]="isTogglingAccess[access.id]">
-                                    {{ isTogglingAccess[access.id] ? 'Updating...' : (access.enabled ? 'Disable' : 'Enable') }}
-                                </button>
-                                <span class="access-status" [class.enabled]="access.enabled" [class.disabled]="!access.enabled">
-                                    {{ access.enabled ? 'Enabled' : 'Disabled' }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="access-description" [innerHTML]="cleanAccessDescription(access.description)"></div>
-                        
-                        <!-- Password Section -->
-                        <div class="access-password" *ngIf="access.password && access.enabled">
-                            <span class="label">Password:</span>
-                            <div class="password-field">
-                                <input [type]="showPassword[access.id] ? 'text' : 'password'" 
-                                       [value]="access.password" 
-                                       readonly
-                                       #passwordInput>
-                                <button (click)="togglePassword(access.id, passwordInput)">{{ showPassword[access.id] ? 'Hide' : 'Show' }}</button>
-                                <button (click)="copyPassword(access.password)">Copy</button>
-                            </div>
-                        </div>
 
-                        <div class="access-password" *ngIf="access.password && !access.enabled">
-                            <span class="label">Password:</span>
-                            <div class="password-field disabled">
-                                <input type="password" 
-                                       value="****************" 
-                                       readonly
-                                       disabled>
-                            </div>
-                        </div>
-                        
-                        <div class="access-action" *ngIf="access.canChangePassword">
-                            <button class="change-pass-btn" (click)="openPasswordModal(access.id)">
-                                {{ access.changeDescription || 'Change Password' }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Change password -->
+            <!-- Modal para mudar password -->
             <div class="modal-overlay" *ngIf="showPasswordModal" (click)="closePasswordModal()">
                 <div class="modal-content" (click)="$event.stopPropagation()">
                     <div class="modal-header">
@@ -226,654 +209,92 @@ import { Subscription, interval } from 'rxjs';
     `,
 
 styles: [`
-    .details-container {
-        padding: 20px;
-        max-width: 1200px;
-        margin: 0 auto;
-    }
-    
-    .details-header {
-        margin-bottom: 24px;
-    }
-    
-    .back-btn {
-        background: none;
-        border: none;
-        color: #667eea;
-        cursor: pointer;
-        font-size: 14px;
-        margin-bottom: 16px;
-        padding: 0;
-    }
-    
-    .back-btn:hover {
-        text-decoration: underline;
-    }
-    
-    .details-header h1 {
-        margin: 0 0 16px 0;
-        color: #333;
-    }
-    
-    .action-buttons {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-    
-    .action-btn {
-        padding: 8px 20px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: 500;
-        transition: all 0.2s;
-    }
-    
-    .action-btn.start {
-        background: #28a745;
-        color: white;
-    }
-    
-    .action-btn.start:hover:not(:disabled) {
-        background: #218838;
-    }
-    
-    .action-btn.stop {
-        background: #ffc107;
-        color: #333;
-    }
-    
-    .action-btn.stop:hover:not(:disabled) {
-        background: #e0a800;
-    }
-    
-    .action-btn.delete {
-        background: #dc3545;
-        color: white;
-    }
-    
-    .action-btn.delete:hover:not(:disabled) {
-        background: #c82333;
-    }
-    
-    .action-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    
-    .info-card {
-        background: white;
-        border-radius: 8px;
-        border: 1px solid #333; 
-        padding: 20px;
-        margin-bottom: 20px;
-        transition: border-color 0.2s;
-    }
-    
-    .info-card:hover {
-        border-color: #626161;
-    }
-    
-    .info-card h3 {
-        margin: 0 0 16px 0;
-        color: #333;
-        border-bottom: 2px solid #667eea;
-        padding-bottom: 8px;
-    }
-    
-    .status-grid, .info-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 12px;
-    }
-    
-    .status-item, .info-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0;
-        border-bottom: 1px solid #333;
-    }
-    
-    .status-item:last-child, .info-row:last-child {
-        border-bottom: none;
-    }
-    
-    .network-table {
-        display: flex;
-        flex-direction: column;
-        border: 1px solid #333; 
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    
-    .network-header, .network-row {
-        display: grid;
-        grid-template-columns: 100px 1fr 1fr 1fr;
-        gap: 12px;
-        padding: 10px;
-    }
-    
-    .network-header {
-        background: #c7c8c9;
-        font-weight: 500;
-        border-bottom: 1px solid #333;
-    }
-    
-    .network-row {
-        border-bottom: 1px solid #333;
-    }
-    
-    .network-row:last-child {
-        border-bottom: none;
-    }
- 
-    .access-list {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    }
-    
-    .access-item {
-        border: 1px solid #333;
-        border-radius: 8px;
-        padding: 16px;
-        transition: border-color 0.2s;
-    }
-    
-    .access-item:hover {
-        border-color: #444;
-    }
-    
-    .access-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #333;
-    }
-
-    .access-controls {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    
-    .access-title {
-        font-weight: 500;
-        color: #333;
-    }
-    
-    .access-status {
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.7rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .access-status.enabled {
-        background: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-    }
-
-    .access-status.disabled {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-    }
-    
-    .access-description {
-        color: #555;
-        margin-bottom: 12px;
-        font-size: 0.9rem;
-    }
-    
-    .access-description ::ng-deep a {
-        color: #667eea;
-        text-decoration: none;
-    }
-    
-    .access-description ::ng-deep a:hover {
-        text-decoration: underline;
-    }
-    
-    .password-field {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        margin-top: 8px;
-        padding: 8px;
-        border: 1px solid #333;
-        border-radius: 4px;
-        background: #f9f9f9;
-    }
-    
-    .password-field input {
-        flex: 1;
-        padding: 6px 10px;
-        border: 1px solid #444;
-        border-radius: 4px;
-        background: #f8f9fa;
-        font-family: monospace;
-    }
-    
-    .password-field button {
-        padding: 6px 12px;
-        background: #667eea;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    
-    .password-field button:hover {
-        background: #5a67d8;
-    }
-    
-    .toggle-btn {
-        padding: 4px 12px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.75rem;
-        font-weight: 500;
-        transition: all 0.2s;
-    }
-
-    .toggle-btn.enabled {
-        background: #dc3545;
-        color: white;
-    }
-
-    .toggle-btn.enabled:hover:not(:disabled) {
-        background: #c82333;
-    }
-
-    .toggle-btn.disabled {
-        background: #28a745;
-        color: white;
-    }
-
-    .toggle-btn.disabled:hover:not(:disabled) {
-        background: #218838;
-    }
-
-    .toggle-btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-
-    .access-status {
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 0.7rem;
-        font-weight: 500;
-    }
-
-    .access-status.enabled {
-        background: #d4edda;
-        color: #155724;
-    }
-
-    .access-status.disabled {
-        background: #f8d7da;
-        color: #721c24;
-    }
-
-    .password-field.disabled {
-        background: #e9ecef;
-    }
-
-    .password-field.disabled input:disabled {
-        background: #e9ecef;
-        cursor: not-allowed;
-    }
-
-    .disabled-note {
-        font-size: 0.7rem;
-        color: #6c757d;
-        margin-left: 8px;
-    }
-    
-    .change-pass-btn {
-        margin-top: 12px;
-        padding: 6px 12px;
-        background: #6c757d;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    
-    .change-pass-btn:hover {
-        background: #5a6268;
-    }
-    
-    .requisites-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-    
-    .requisite-tag {
-        background: #e9ecef;
-        padding: 4px 12px;
-        border-radius: 16px;
-        font-size: 0.8rem;
-        color: #495057;
-        border: 1px solid #333; 
-    }
-    
-    .label {
-        font-weight: 500;
-        color: #666;
-    }
-    
-    .value {
-        color: #333;
-    }
-    
-    .value.running {
-        color: #28a745;
-        font-weight: bold;
-    }
-    
-    .value.low {
-        color: #dc3545;
-        font-weight: bold;
-    }
-    
-    .note {
-        font-size: 0.8rem;
-        color: #666;
-        margin-left: 8px;
-    }
-    
-    .description {
-        color: #555;
-        line-height: 1.6;
-        margin: 0;
-        white-space: pre-wrap;
-        padding: 12px;
-        border: 1px solid #333;
-        border-radius: 8px;
-        background: #fafafa62;
-    }
-    
-    .loading {
-        text-align: center;
-        padding: 50px;
-    }
-    
-    .spinner {
-        border: 3px solid #f3f3f3;
-        border-top: 3px solid #667eea;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 20px;
-    }
-    
-    .editable-value {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }   
-
-    .edit-input {
-        padding: 6px 10px;
-        border: 1px solid #333;
-        border-radius: 4px;
-        font-size: 14px;
-        width: 200px;
-    }   
-
-    .edit-icon, .save-icon, .cancel-icon {
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-size: 16px;
-        padding: 0 4px;
-    }   
-
-    .edit-icon:hover { opacity: 0.7; }
-    .save-icon { color: #28a745; }
-    .cancel-icon { color: #dc3545; }    
-
-    .description-container {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-    }   
-
-    .description-column {
-        border: 1px solid #333;
-        border-radius: 8px;
-        overflow: hidden;
-    }   
-
-    .description-header {
-        background: #f8f9fa;
-        padding: 12px 16px;
-        border-bottom: 1px solid #333;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }   
-
-    .edit-icon-small {
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #667eea;
-        font-size: 12px;
-    }   
-
-    .edit-icon-small:hover {
-        text-decoration: underline;
-    }   
-
-    .description-content {
-        padding: 16px;
-        line-height: 1.6;
-        white-space: pre-wrap;
-        min-height: 150px;
-    }   
-
-    .description-content.read-only {
-        background: #fafafa;
-        color: #666;
-    }   
-
-    .description-edit {
-        padding: 16px;
-    }   
-
-    .edit-textarea {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #333;
-        border-radius: 4px;
-        font-family: monospace;
-        font-size: 13px;
-        resize: vertical;
-    }   
-
-    .edit-actions {
-        margin-top: 12px;
-        display: flex;
-        gap: 8px;
-    }   
-
-    .save-btn {
-        background: #28a745;
-        color: white;
-        border: none;
-        padding: 6px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-    }   
-
-    .save-btn:hover:not(:disabled) {
-        background: #218838;
-    }   
-
-    .save-btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }   
-
-    .cancel-btn {
-        background: #6c757d;
-        color: white;
-        border: none;
-        padding: 6px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-    }   
-
-    .cancel-btn:hover {
-        background: #5a6268;
-    }
-
-    .reset-dtr-btn {
-        margin-left: 10px;
-        padding: 2px 8px;
-        background: #ffc107;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.7rem;
-    }
-
-    .reset-dtr-btn:hover:not(:disabled) {
-        background: #e0a800;
-    }
-
-    .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-    }   
-
-    .modal-content {
-        background: white;
-        border-radius: 12px;
-        max-width: 450px;
-        width: 90%;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    }   
-
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 16px 20px;
-        border-bottom: 1px solid #e9ecef;
-        background: #2c3e50;
-        color: white;
-        border-radius: 12px 12px 0 0;
-    }   
-
-    .modal-header h3 {
-        margin: 0;
-        font-size: 1.1rem;
-    }   
-
-    .modal-close {
-        background: none;
-        border: none;
-        color: white;
-        font-size: 24px;
-        cursor: pointer;
-        line-height: 1;
-        padding: 0;
-        margin: 0;
-    }   
-
-    .modal-close:hover {
-        opacity: 0.8;
-    }   
-
-    .modal-body {
-        padding: 20px;
-    }   
-
-    .modal-body label {
-        display: block;
-        margin-bottom: 5px;
-        color: #555;
-        font-weight: 500;
-    }   
-
-    .password-input-modal {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 14px;
-        box-sizing: border-box;
-    }   
-
-    .password-input-modal:focus {
-        outline: none;
-        border-color: #667eea;
-    }   
-
-    .modal-footer {
-        padding: 16px 20px;
-        border-top: 1px solid #e9ecef;
-        text-align: right;
-        background: #f8f9fa;
-        border-radius: 0 0 12px 12px;
-        display: flex;
-        gap: 10px;
-        justify-content: flex-end;
-    }
-    
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    
-    @media (max-width: 768px) {
-        .details-container {
-            padding: 16px;
-        }
-        
-        .network-header, .network-row {
-            grid-template-columns: 80px 1fr;
-            gap: 8px;
-        }
-        
-        .network-header span:nth-child(3),
-        .network-header span:nth-child(4),
-        .network-row span:nth-child(3),
-        .network-row span:nth-child(4) {
-            display: none;
-        }
-        
-        .status-grid, .info-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .action-buttons {
-            justify-content: center;
-        }
-        }
+.details-container{padding:20px;max-width:1200px;margin:0 auto}
+.details-header{margin-bottom:24px}
+.back-btn{background:0 0;border:none;color:#667eea;cursor:pointer;font-size:14px;margin-bottom:16px;padding:0}
+.back-btn:hover{text-decoration:underline}
+.title-section{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.title-section h1{margin:0;color:#333}
+.dns-name{font-size:.9rem;color:#6c757d;font-family:monospace;background:#f8f9fa;padding:4px 8px;border-radius:4px}
+.action-buttons{display:flex;gap:12px;flex-wrap:wrap}
+.action-btn{padding:8px 20px;border:none;border-radius:4px;cursor:pointer;font-weight:500;transition:all .2s}
+.action-btn.start{background:#28a745;color:#fff}
+.action-btn.start:hover:not(:disabled){background:#218838}
+.action-btn.stop{background:#ffc107;color:#333}
+.action-btn.stop:hover:not(:disabled){background:#e0a800}
+.action-btn.delete{background:#dc3545;color:#fff}
+.action-btn.delete:hover:not(:disabled){background:#c82333}
+.action-btn.reset-dtr{background:#17a2b8;color:#fff}
+.action-btn.reset-dtr:hover:not(:disabled){background:#138496}
+.action-btn:disabled{opacity:.5;cursor:not-allowed}
+.info-card{background:#fff;border-radius:8px;border:1px solid #333;padding:20px;margin-bottom:20px}
+.info-card h3{margin:0 0 16px;color:#333;border-bottom:2px solid #667eea;padding-bottom:8px}
+.status-grid,.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.status-item,.info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #333}
+.status-item:last-child,.info-row:last-child{border-bottom:none}
+.label{font-weight:500;color:#666}
+.value{color:#333}
+.value.running{color:#28a745;font-weight:700}
+.value.low{color:#dc3545;font-weight:700}
+.note{font-size:.8rem;color:#666;margin-left:8px}
+.access-list{display:flex;flex-direction:column;gap:20px}
+.access-item{border:1px solid #333;border-radius:8px;padding:16px}
+.access-header{display:flex;justify-content:flex-end;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #333}
+.access-controls{display:flex;align-items:center;gap:12px}
+.access-status{padding:4px 12px;border-radius:20px;font-size:.7rem;font-weight:600;text-transform:uppercase}
+.access-status.enabled{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
+.access-status.disabled{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+.toggle-btn{padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-size:.75rem;font-weight:500}
+.toggle-btn.enabled{background:#dc3545;color:#fff}
+.toggle-btn.enabled:hover:not(:disabled){background:#c82333}
+.toggle-btn.disabled{background:#28a745;color:#fff}
+.toggle-btn.disabled:hover:not(:disabled){background:#218838}
+.toggle-btn:disabled{opacity:.6;cursor:not-allowed}
+.access-description{color:#555;margin-bottom:12px;font-size:.9rem}
+.access-description ::ng-deep a{color:#667eea;text-decoration:none}
+.access-description ::ng-deep a:hover{text-decoration:underline}
+.password-field{display:flex;gap:8px;align-items:center;margin-top:8px;padding:8px;border:1px solid #333;border-radius:4px;background:#f9f9f9}
+.password-field input{flex:1;padding:6px 10px;border:1px solid #444;border-radius:4px;background:#f8f9fa;font-family:monospace}
+.password-field button{padding:6px 12px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer}
+.password-field button:hover{background:#5a67d8}
+.change-pass-btn{margin-top:12px;padding:6px 12px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer}
+.change-pass-btn:hover{background:#5a6268}
+.description-container{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.description-column{border:1px solid #333;border-radius:8px;overflow:hidden}
+.description-header{background:#f8f9fa;padding:12px 16px;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center}
+.edit-icon-small{background:0 0;border:none;cursor:pointer;color:#667eea;font-size:12px}
+.edit-icon-small:hover{text-decoration:underline}
+.description-content{padding:16px;line-height:1.6;white-space:pre-wrap;min-height:150px}
+.description-content.read-only{background:#fafafa;color:#666}
+.description-edit{padding:16px}
+.edit-textarea{width:100%;padding:8px;border:1px solid #333;border-radius:4px;font-family:monospace;font-size:13px;resize:vertical}
+.edit-actions{margin-top:12px;display:flex;gap:8px}
+.editable-value{display:flex;align-items:center;gap:8px}
+.edit-input{padding:6px 10px;border:1px solid #333;border-radius:4px;font-size:14px;width:200px}
+.edit-icon,.save-icon,.cancel-icon{background:0 0;border:none;cursor:pointer;font-size:16px;padding:0 4px}
+.edit-icon:hover{opacity:.7}
+.save-icon{color:#28a745}
+.cancel-icon{color:#dc3545}
+.save-btn{background:#28a745;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer}
+.save-btn:hover:not(:disabled){background:#218838}
+.save-btn:disabled{opacity:.6;cursor:not-allowed}
+.cancel-btn{background:#6c757d;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer}
+.cancel-btn:hover{background:#5a6268}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-content{background:#fff;border-radius:12px;max-width:450px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #e9ecef;background:#2c3e50;color:#fff;border-radius:12px 12px 0 0}
+.modal-header h3{margin:0;font-size:1.1rem}
+.modal-close{background:0 0;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;padding:0;margin:0}
+.modal-close:hover{opacity:.8}
+.modal-body{padding:20px}
+.modal-body label{display:block;margin-bottom:5px;color:#555;font-weight:500}
+.password-input-modal{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;box-sizing:border-box}
+.password-input-modal:focus{outline:none;border-color:#667eea}
+.modal-footer{padding:16px 20px;border-top:1px solid #e9ecef;text-align:right;background:#f8f9fa;border-radius:0 0 12px 12px;display:flex;gap:10px;justify-content:flex-end}
+.loading{text-align:center;padding:50px}
+.spinner{border:3px solid #f3f3f3;border-top:3px solid #6c757d;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 20px}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@media (max-width:768px){.details-container{padding:16px}.network-header,.network-row{grid-template-columns:80px 1fr;gap:8px}.network-header span:nth-child(3),.network-header span:nth-child(4),.network-row span:nth-child(3),.network-row span:nth-child(4){display:none}.status-grid,.info-grid{grid-template-columns:1fr}.action-buttons{justify-content:center}}
     `]
 })
 
@@ -981,10 +402,6 @@ export class VSDetailsComponent implements OnInit {
         this.router.navigate(['/vs']);
     }
     
-    goBack(): void {
-        this.router.navigate(['/vs']);
-    }
-    
     startVS(): void {
         if (!this.vs) return;
         
@@ -998,10 +415,8 @@ export class VSDetailsComponent implements OnInit {
             next: (response) => {
                 this.actionMessage = 'Virtual server started successfully!';
                 this.isError = false;
-                // Recarregar detalhes para atualizar o estado
                 setTimeout(() => {
                     this.loadVSDetails(this.vs!.folderName);
-                    // Atualizar crédito (o custo duplica quando running)
                     this.creditService.refreshCredit();
                 }, 2000);
                 this.isStarting = false;
@@ -1081,7 +496,6 @@ export class VSDetailsComponent implements OnInit {
                 this.vs = null;
 
                 setTimeout(() => {
-                    // Usar replaceUrl para não manter a página apagada no histórico
                     this.router.navigate(['/vs'], { replaceUrl: true });
                 }, 1500);
 
@@ -1242,7 +656,6 @@ export class VSDetailsComponent implements OnInit {
         const attributeName = `CUSTOM_ACCESS${this.selectedAccessId}_PASS`;
         this.vsService.setAttribute(this.vs.folderName, attributeName, this.newPassword, true).subscribe({
             next: () => {
-                // Atualizar localmente
                 if (this.vs?.customAccesses) {
                     const access = this.vs.customAccesses.find(a => a.id === this.selectedAccessId);
                     if (access) {
@@ -1278,25 +691,22 @@ export class VSDetailsComponent implements OnInit {
         this.openPasswordModal(accessId);
     }
 
-    /**
-     * Ativa ou desativa um método de acesso
-     * @param accessId - ID do acesso (1-25)
-     * @param enabled - true para ativar, false para desativar
-     */
     toggleAccess(accessId: number, enabled: boolean): void {
         if (!this.vs) return;
-        
+
         this.isTogglingAccess[accessId] = true;
         this.cdr.detectChanges();
-        
-        const action = enabled ? 'enable' : 'disable';
-        
+
         this.vsService.toggleAccessEnabled(this.vs.folderName, accessId, enabled).subscribe({
             next: () => {
-                this.loadVSDetails(this.vs!.folderName);
+                const access = this.vs?.customAccesses?.find(a => a.id === accessId);
+                if (access) {
+                    access.enabled = enabled;
+                    this.refreshSingleAccessDescription(accessId);
+                }
 
                 this.isTogglingAccess[accessId] = false;
-                this.actionMessage = `Access ${action}d successfully!`;
+                this.actionMessage = `Access ${enabled ? 'enabled' : 'disabled'} successfully!`;
                 this.isError = false;
                 this.cdr.detectChanges();
 
@@ -1306,8 +716,8 @@ export class VSDetailsComponent implements OnInit {
                 }, 3000);
             },
             error: (error) => {
-                console.error(`Error ${action}ing access:`, error);
-                this.actionMessage = error.error?.error || `Failed to ${action} access`;
+                console.error(`Error toggling access:`, error);
+                this.actionMessage = error.error?.error || `Failed to ${enabled ? 'enable' : 'disable'} access`;
                 this.isError = true;
                 this.isTogglingAccess[accessId] = false;
                 this.cdr.detectChanges();
@@ -1320,13 +730,32 @@ export class VSDetailsComponent implements OnInit {
         });
     }
 
+    refreshSingleAccessDescription(accessId: number): void {
+        if (!this.vs) return;
+
+        this.vsService.getVSDetails(this.vs.folderName).subscribe({
+            next: (response) => {
+                if (response.success && response.data) {
+                    const updatedAccess = response.data.customAccesses?.find(a => a.id === accessId);
+                    const currentAccess = this.vs?.customAccesses?.find(a => a.id === accessId);
+                    if (updatedAccess && currentAccess) {
+                        currentAccess.description = updatedAccess.description;
+                        currentAccess.password = updatedAccess.password;
+                    }
+                    this.cdr.detectChanges();
+                }
+            },
+            error: (error) => console.error('Error refreshing access description:', error)
+        });
+    }
+
     /**
-     * Limpa a descrição do acesso removendo indicações de ENABLED/DISABLED (fallback)
+     * Remove indicações de ENABLED/DISABLED (fallback)
      */
     cleanAccessDescription(description: string): string {
         if (!description) return '';
 
-        // Remover padrões como "ENABLED", "DISABLED", " (Enabled)", " - ENABLED", etc.
+        // Remover "ENABLED", "DISABLED", " (Enabled)", " - ENABLED", etc.
         let cleaned = description
             .replace(/\s*\(?(ENABLED|DISABLED)\)?\s*/gi, '')
             .replace(/\s*-\s*(ENABLED|DISABLED)\s*/gi, '')
@@ -1336,25 +765,41 @@ export class VSDetailsComponent implements OnInit {
         return cleaned || description;
     }
     
-    /**
-     * Reseta o DTR (Days To Run) para 30 dias
-     */
-    resetDTR(): void {
+     resetDTR(): void {
         if (!this.vs) return;
-        
+
         this.isResettingDTR = true;
-        this.vsService.setAttribute(this.vs.folderName, 'VS_DTR', '30').subscribe({
+        this.isActionInProgress = true;
+        this.cdr.detectChanges();
+
+        this.vsService.resetDTR(this.vs.folderName).subscribe({
             next: () => {
-                this.vs!.dtr = 30;
-                this.isResettingDTR = false;
                 this.actionMessage = 'DTR reset to 30 days successfully!';
+                this.isError = false;
+                setTimeout(() => {
+                    this.loadVSDetails(this.vs!.folderName);
+                    this.creditService.refreshCredit();
+                }, 1000);
+                this.isResettingDTR = false;
+                this.isActionInProgress = false;
                 this.cdr.detectChanges();
-                setTimeout(() => this.actionMessage = '', 3000);
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 3000);
             },
             error: (error) => {
-                this.actionMessage = 'Failed to reset DTR';
+                this.actionMessage = error.error?.error || 'Failed to reset DTR';
+                this.isError = true;
                 this.isResettingDTR = false;
+                this.isActionInProgress = false;
                 this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 5000);
             }
         });
     }

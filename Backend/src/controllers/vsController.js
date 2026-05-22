@@ -325,7 +325,7 @@ async function setAttribute(req, res) {
 
 /**
  * POST /api/vs/:folderName/reset-dtr
- * Reseta o DTR (Days To Run) para o valor padrão (30 dias)
+ * Reseta o DTR para 30 dias
  */
 async function resetDTR(req, res) {
     try {
@@ -337,26 +337,14 @@ async function resetDTR(req, res) {
         res.json({
             success: true,
             data: result,
-            message: result.message
+            message: 'DTR reset to 30 days successfully'
         });
         
     } catch (error) {
         console.error('Error in resetDTR:', error);
-        
-        let statusCode = 500;
-        let errorMessage = error.message;
-        
-        if (error.message.includes('not found')) {
-            statusCode = 404;
-        } else if (error.message.includes('Access denied')) {
-            statusCode = 403;
-        } else if (error.message.includes('must be stopped')) {
-            statusCode = 400;
-        }
-        
-        res.status(statusCode).json({
+        res.status(500).json({
             success: false,
-            error: errorMessage
+            error: error.message
         });
     }
 }
