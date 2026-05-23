@@ -496,7 +496,7 @@ async function deleteVS(vsFolderName, username) {
 }
 
 /**
- * Altera um atributo de um VS
+ * Altera um atributo de um VS usando o script ctl/setInfo
  * @param {string} vsFolderName - Nome da pasta do VS
  * @param {string} username - Nome do utilizador (para verificar permissão)
  * @param {string} attributeName - Nome do atributo
@@ -514,6 +514,7 @@ async function setAttribute(vsFolderName, username, attributeName, value) {
             throw new Error(`Access denied. You do not own this virtual server.`);
         }
         
+        // Verificar se o atributo é editável
         const editableAttributes = ['VS_NAME', 'VS_DESC'];
         const customAccessMatch = attributeName.match(/^CUSTOM_ACCESS(\d+)_(PASS|ENABLED_DISABLED)$/);
         
@@ -521,21 +522,27 @@ async function setAttribute(vsFolderName, username, attributeName, value) {
             throw new Error(`Attribute ${attributeName} is not editable`);
         }
         
+        // Validar valor para ENABLED_DISABLED
         if (attributeName.includes('ENABLED_DISABLED')) {
             if (value !== 'enabled' && value !== 'disabled') {
                 throw new Error(`ENABLED_DISABLED must be 'enabled' or 'disabled'`);
             }
         }
+        let commandValue = value;
+        let commandAttribute = attributeName;
         
-        const base64Value = Buffer.from(value, 'utf8').toString('base64');
-        const attributeWithSuffix = `${attributeName}64`;
+        // Para valores com caracteres especiais (passwords, descrições longas), usar base64
+        if (attributeName === 'VS_NAME' || attributeName === 'VS_DESC' || attributeName.includes('PASS')) {
+            const base64Value = Buffer.from(value, 'utf8').toString('base64');
+            commandAttribute = `${attributeName}64`;
+            commandValue = base64Value;
+        }
         
-        const node = await getBestNodeForVS(vsFolderName);
+        const command = `/ctl/setInfo ${vsFolderName} ${commandAttribute} ${commandValue}`;
+        console.log(`Setting attribute: ${command}`);
         
-        const command = `setInfo ${attributeWithSuffix} ${base64Value}`;
-        console.log(`Setting attribute: ${command} on node ${node}`);
-        
-        const output = await runRemoteCommandOnNode(node, vsFolderName, command);
+        const output = await runLocalCommand(command);
+        console.log(`SetInfo output: ${output}`);
         
         return {
             success: true,

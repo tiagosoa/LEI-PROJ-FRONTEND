@@ -331,4 +331,58 @@ describe('VSService', () => {
                 .rejects.toThrow('Cannot delete VS. Please stop it first');
         });
     });
+
+    describe('setAttribute', () => {
+        beforeEach(() => {
+            getMultipleAttributes.mockResolvedValue({
+                VS_STATUS: 'stopped',
+                VS_NAME: 'Test Server',
+                VS_DESC: 'Test Description',
+                VST_COST: '10',
+                VS_HOST: '',
+                VS_DTR: '30'
+            });
+            runLocalCommand.mockResolvedValue('OK');
+        });
+
+        it('should update VS_NAME successfully', async () => {
+            const result = await vsService.setAttribute('VS_7_testuser_216', 'testuser', 'VS_NAME', 'New Server Name');
+
+            expect(result.success).toBe(true);
+            expect(runLocalCommand).toHaveBeenCalledWith(
+                expect.stringMatching(/\/ctl\/setInfo VS_7_testuser_216 VS_NAME64 .+/)
+            );
+        });
+
+        it('should update CUSTOM_ACCESS ENABLED_DISABLED successfully', async () => {
+            const result = await vsService.setAttribute('VS_7_testuser_216', 'testuser', 'CUSTOM_ACCESS1_ENABLED_DISABLED', 'enabled');
+
+            expect(result.success).toBe(true);
+            expect(runLocalCommand).toHaveBeenCalledWith('/ctl/setInfo VS_7_testuser_216 CUSTOM_ACCESS1_ENABLED_DISABLED enabled');
+        });
+
+        it('should update CUSTOM_ACCESS PASS successfully with base64', async () => {
+            const result = await vsService.setAttribute('VS_7_testuser_216', 'testuser', 'CUSTOM_ACCESS1_PASS', 'newPassword123');
+
+            expect(result.success).toBe(true);
+            expect(runLocalCommand).toHaveBeenCalledWith(
+                expect.stringMatching(/\/ctl\/setInfo VS_7_testuser_216 CUSTOM_ACCESS1_PASS64 .+/)
+            );
+        });
+
+        it('should throw error for non-editable attribute', async () => {
+            await expect(vsService.setAttribute('VS_7_testuser_216', 'testuser', 'VS_STATUS', 'running'))
+                .rejects.toThrow('is not editable');
+        });
+
+        it('should throw error when user does not own the VS', async () => {
+            await expect(vsService.setAttribute('VS_7_otheruser_216', 'testuser', 'VS_NAME', 'New Name'))
+                .rejects.toThrow('Access denied');
+        });
+
+        it('should validate ENABLED_DISABLED values', async () => {
+            await expect(vsService.setAttribute('VS_7_testuser_216', 'testuser', 'CUSTOM_ACCESS1_ENABLED_DISABLED', 'invalid'))
+                .rejects.toThrow("ENABLED_DISABLED must be 'enabled' or 'disabled'");
+        });
+    });
 });
