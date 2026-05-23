@@ -190,7 +190,7 @@ export class AppComponent implements OnInit, OnDestroy {
                 
                 // Redirecionar se necessário
                 const currentUrl = this.router.url;
-                if (currentUrl === '/' || currentUrl === '/dashboard' || currentUrl === '/login') {
+                if (currentUrl === '/' || currentUrl === '/login') {
                     this.router.navigate(['/vs']);
                 }
             });

@@ -358,7 +358,7 @@ export class VSDetailsComponent implements OnInit {
             this.isLoading = true;
             this.cdr.detectChanges();
         }
-
+    
         this.vsService.getVSDetails(folderName).subscribe({
             next: (response) => {
                 if (response.success && response.data) {
@@ -404,24 +404,36 @@ export class VSDetailsComponent implements OnInit {
     
     startVS(): void {
         if (!this.vs) return;
-        
+
         this.isStarting = true;
         this.isActionInProgress = true;
         this.actionMessage = '';
         this.isError = false;
         this.cdr.detectChanges();
-        
+
         this.vsService.startVS(this.vs.folderName).subscribe({
             next: (response) => {
                 this.actionMessage = 'Virtual server started successfully!';
                 this.isError = false;
-                setTimeout(() => {
-                    this.loadVSDetails(this.vs!.folderName);
-                    this.creditService.refreshCredit();
-                }, 2000);
+                
+                if (this.vs) {
+                    this.vs.softStatus = 'starting';
+                    this.vs.hardStatus = 'starting';
+                    this.cdr.detectChanges();
+                }
+
+                this.loadVSDetails(this.vs!.folderName);
+
+                this.creditService.refreshCredit();
+
                 this.isStarting = false;
                 this.isActionInProgress = false;
                 this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 3000);
             },
             error: (error) => {
                 this.actionMessage = error.error?.error || 'Failed to start virtual server';
@@ -429,6 +441,7 @@ export class VSDetailsComponent implements OnInit {
                 this.isStarting = false;
                 this.isActionInProgress = false;
                 this.cdr.detectChanges();
+
                 setTimeout(() => {
                     this.actionMessage = '';
                     this.cdr.detectChanges();
@@ -436,27 +449,38 @@ export class VSDetailsComponent implements OnInit {
             }
         });
     }
-    
+
     stopVS(): void {
         if (!this.vs) return;
-        
+
         this.isStopping = true;
         this.isActionInProgress = true;
         this.actionMessage = '';
         this.isError = false;
         this.cdr.detectChanges();
-        
+
         this.vsService.stopVS(this.vs.folderName).subscribe({
             next: (response) => {
                 this.actionMessage = 'Virtual server stopped successfully!';
                 this.isError = false;
-                setTimeout(() => {
-                    this.loadVSDetails(this.vs!.folderName);
-                    this.creditService.refreshCredit();
-                }, 2000);
+                if (this.vs) {
+                    this.vs.softStatus = 'stopping';
+                    this.vs.hardStatus = 'stopping';
+                    this.cdr.detectChanges();
+                }
+
+                this.loadVSDetails(this.vs!.folderName);
+
+                this.creditService.refreshCredit();
+
                 this.isStopping = false;
                 this.isActionInProgress = false;
                 this.cdr.detectChanges();
+
+                setTimeout(() => {
+                    this.actionMessage = '';
+                    this.cdr.detectChanges();
+                }, 3000);
             },
             error: (error) => {
                 this.actionMessage = error.error?.error || 'Failed to stop virtual server';
@@ -464,7 +488,7 @@ export class VSDetailsComponent implements OnInit {
                 this.isStopping = false;
                 this.isActionInProgress = false;
                 this.cdr.detectChanges();
-                
+
                 setTimeout(() => {
                     this.actionMessage = '';
                     this.cdr.detectChanges();
@@ -765,7 +789,7 @@ export class VSDetailsComponent implements OnInit {
         return cleaned || description;
     }
     
-     resetDTR(): void {
+    resetDTR(): void {
         if (!this.vs) return;
 
         this.isResettingDTR = true;
@@ -776,10 +800,16 @@ export class VSDetailsComponent implements OnInit {
             next: () => {
                 this.actionMessage = 'DTR reset to 30 days successfully!';
                 this.isError = false;
-                setTimeout(() => {
-                    this.loadVSDetails(this.vs!.folderName);
-                    this.creditService.refreshCredit();
-                }, 1000);
+
+                if (this.vs) {
+                    this.vs.dtr = 30;
+                    this.cdr.detectChanges();
+                }
+
+
+                this.loadVSDetails(this.vs!.folderName);
+                this.creditService.refreshCredit();
+
                 this.isResettingDTR = false;
                 this.isActionInProgress = false;
                 this.cdr.detectChanges();
