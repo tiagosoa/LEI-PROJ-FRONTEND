@@ -1,9 +1,9 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { RouterModule, RouterOutlet, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
 import { CreditService } from './services/credit.service';
-import { Subscription } from 'rxjs';
+import { Subscription, filter } from 'rxjs';
 import { CreditInfo } from './models/credit.model';
 
 @Component({
@@ -17,10 +17,11 @@ import { CreditInfo } from './models/credit.model';
                     <h1>DEI Virtual Servers Private Cloud</h1>
                 </div>
                 <div class="header-right">
-                    <div class="credit-info" *ngIf="credit">
+                    <!-- Remover *ngIf para testar - sempre mostrar o container, mesmo vazio -->
+                    <div class="credit-info">
                         <span class="credit-label">Used credit:</span>
                         <span class="credit-value" [class.warning]="isLowCredit()">
-                            {{ credit.used }} / {{ credit.total }}
+                            {{ getCreditText() }}
                         </span>
                     </div>
                     <div class="user-info">
@@ -71,6 +72,8 @@ import { CreditInfo } from './models/credit.model';
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 0.9rem;
+            min-width: 100px;
+            text-align: center;
         }
         
         .credit-label {
@@ -150,32 +153,63 @@ import { CreditInfo } from './models/credit.model';
 export class AppComponent implements OnInit, OnDestroy {
     credit: CreditInfo | null = null;
     private creditSubscription: Subscription | null = null;
+    private userSubscription: Subscription | null = null;
     
     constructor(
         public authService: AuthService,
         private creditService: CreditService,
-        private router: Router
+        private router: Router,
+        private cdr: ChangeDetectorRef
     ) {}
     
     ngOnInit(): void {
+        console.log('AppComponent: Initializing');
+        
+        // Subscrever mudanças no crédito
         this.creditSubscription = this.creditService.credit$.subscribe(credit => {
+            console.log('AppComponent: Credit updated:', credit);
             this.credit = credit;
+            // Forçar deteção de mudanças
+            this.cdr.detectChanges();
         });
         
-        this.authService.currentUser$.subscribe(user => {
-            if (user) {
-                this.creditService.getCredit().subscribe();
-                if (this.router.url === '/' || this.router.url === '/dashboard') {
+        // Subscrever mudanças no utilizador
+        this.userSubscription = this.authService.currentUser$
+            .pipe(filter(user => user !== null))
+            .subscribe(user => {
+                console.log('AppComponent: User logged in:', user?.username);
+                
+                // Carregar crédito imediatamente
+                this.creditService.getCredit().subscribe({
+                    next: () => {
+                        console.log('AppComponent: Credit loaded successfully');
+                        this.cdr.detectChanges();
+                    },
+                    error: (err) => console.error('AppComponent: Error loading credit:', err)
+                });
+                
+                // Redirecionar se necessário
+                const currentUrl = this.router.url;
+                if (currentUrl === '/' || currentUrl === '/dashboard' || currentUrl === '/login') {
                     this.router.navigate(['/vs']);
                 }
-            }
-        });
+            });
     }
     
     ngOnDestroy(): void {
         if (this.creditSubscription) {
             this.creditSubscription.unsubscribe();
         }
+        if (this.userSubscription) {
+            this.userSubscription.unsubscribe();
+        }
+    }
+    
+    getCreditText(): string {
+        if (this.credit) {
+            return `${this.credit.used} / ${this.credit.total}`;
+        }
+        return 'Loading...';
     }
     
     isLowCredit(): boolean {
@@ -186,6 +220,6 @@ export class AppComponent implements OnInit, OnDestroy {
     
     logout(): void {
         this.authService.logout();
-        window.location.href = '/login';
+        this.router.navigate(['/login']);
     }
 }
