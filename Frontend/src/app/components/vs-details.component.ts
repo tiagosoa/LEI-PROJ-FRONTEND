@@ -415,14 +415,14 @@ export class VSDetailsComponent implements OnInit {
             next: (response) => {
                 this.actionMessage = 'Virtual server started successfully!';
                 this.isError = false;
-                
+
                 if (this.vs) {
-                    this.vs.softStatus = 'starting';
-                    this.vs.hardStatus = 'starting';
+                    this.vs.softStatus = 'running';
+                    this.vs.hardStatus = 'running';
+                    this.vs.cost = this.vs.baseCost * 2;
+                    this.vs.host = 'Starting...';
                     this.cdr.detectChanges();
                 }
-
-                this.loadVSDetails(this.vs!.folderName);
 
                 this.creditService.refreshCredit();
 
@@ -464,12 +464,12 @@ export class VSDetailsComponent implements OnInit {
                 this.actionMessage = 'Virtual server stopped successfully!';
                 this.isError = false;
                 if (this.vs) {
-                    this.vs.softStatus = 'stopping';
-                    this.vs.hardStatus = 'stopping';
+                    this.vs.softStatus = 'stopped';
+                    this.vs.hardStatus = 'stopped';
+                    this.vs.cost = this.vs.baseCost;
+                    this.vs.host = null;
                     this.cdr.detectChanges();
                 }
-
-                this.loadVSDetails(this.vs!.folderName);
 
                 this.creditService.refreshCredit();
 
@@ -496,6 +496,8 @@ export class VSDetailsComponent implements OnInit {
             }
         });
     }
+
+
     
     deleteVS(): void {
         if (!this.vs) return;
@@ -800,14 +802,12 @@ export class VSDetailsComponent implements OnInit {
             next: () => {
                 this.actionMessage = 'DTR reset to 30 days successfully!';
                 this.isError = false;
-
+                
                 if (this.vs) {
                     this.vs.dtr = 30;
                     this.cdr.detectChanges();
                 }
 
-
-                this.loadVSDetails(this.vs!.folderName);
                 this.creditService.refreshCredit();
 
                 this.isResettingDTR = false;
