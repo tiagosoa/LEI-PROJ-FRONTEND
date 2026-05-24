@@ -623,5 +623,6 @@ module.exports = {
     stopVS,
     deleteVS,
     setAttribute,
+    getBestNodeForVS,
     resetDTR
 };

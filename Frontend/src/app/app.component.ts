@@ -154,6 +154,7 @@ export class AppComponent implements OnInit, OnDestroy {
     credit: CreditInfo | null = null;
     private creditSubscription: Subscription | null = null;
     private userSubscription: Subscription | null = null;
+    private isRestoringSession = false;
     
     constructor(
         public authService: AuthService,
@@ -165,21 +166,17 @@ export class AppComponent implements OnInit, OnDestroy {
     ngOnInit(): void {
         console.log('AppComponent: Initializing');
         
-        // Subscrever mudanças no crédito
         this.creditSubscription = this.creditService.credit$.subscribe(credit => {
             console.log('AppComponent: Credit updated:', credit);
             this.credit = credit;
-            // Forçar deteção de mudanças
             this.cdr.detectChanges();
         });
         
-        // Subscrever mudanças no utilizador
         this.userSubscription = this.authService.currentUser$
             .pipe(filter(user => user !== null))
             .subscribe(user => {
                 console.log('AppComponent: User logged in:', user?.username);
                 
-                // Carregar crédito imediatamente
                 this.creditService.getCredit().subscribe({
                     next: () => {
                         console.log('AppComponent: Credit loaded successfully');
@@ -188,12 +185,15 @@ export class AppComponent implements OnInit, OnDestroy {
                     error: (err) => console.error('AppComponent: Error loading credit:', err)
                 });
                 
-                // Redirecionar se necessário
                 const currentUrl = this.router.url;
                 if (currentUrl === '/' || currentUrl === '/login') {
+                    console.log('AppComponent: Redirecting from root to /vs');
                     this.router.navigate(['/vs']);
+                } else {
+                    console.log('AppComponent: Staying on current URL:', currentUrl);
                 }
             });
+        this.restoreRouteAfterRefresh();
     }
     
     ngOnDestroy(): void {
@@ -202,6 +202,29 @@ export class AppComponent implements OnInit, OnDestroy {
         }
         if (this.userSubscription) {
             this.userSubscription.unsubscribe();
+        }
+    }
+    
+    /**
+     * Restaura a rota após refresh do browser
+     */
+    private restoreRouteAfterRefresh(): void {
+        window.addEventListener('beforeunload', () => {
+            const currentUrl = this.router.url;
+            if (currentUrl !== '/login' && currentUrl !== '/') {
+                sessionStorage.setItem('redirectAfterLogin', currentUrl);
+            }
+        });
+        
+        const savedRoute = sessionStorage.getItem('redirectAfterLogin');
+        if (savedRoute && savedRoute !== '/login' && savedRoute !== '/') {
+            console.log('AppComponent: Restoring route:', savedRoute);
+            sessionStorage.removeItem('redirectAfterLogin');
+            setTimeout(() => {
+                if (this.authService.isAuthenticated()) {
+                    this.router.navigate([savedRoute]);
+                }
+            }, 50);
         }
     }
     
@@ -219,6 +242,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     
     logout(): void {
+        sessionStorage.removeItem('redirectAfterLogin');
         this.authService.logout();
         this.router.navigate(['/login']);
     }

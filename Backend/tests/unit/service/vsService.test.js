@@ -1,9 +1,17 @@
 const vsService = require('../../../src/services/vsService');
-const { runLocalCommand, getAttribute, getMultipleAttributes } = require('../../../src/utils/commandExecutor');
+const { runLocalCommand, getAttribute, getMultipleAttributes, runRemoteCommandOnNode } = require('../../../src/utils/commandExecutor');
 const fs = require('fs').promises;
 
 // Mocks
-jest.mock('../../../src/utils/commandExecutor');
+jest.mock('../../../src/utils/commandExecutor', () => ({
+    runLocalCommand: jest.fn(),
+    runRemoteCommandOnNode: jest.fn(),
+    getAttribute: jest.fn(),
+    getMultipleAttributes: jest.fn(),
+    BASE_FOLDER: '/mock/vs_cloud'
+}));
+
+
 jest.mock('fs', () => ({
     promises: {
         readFile: jest.fn()
@@ -385,4 +393,130 @@ describe('VSService', () => {
                 .rejects.toThrow("ENABLED_DISABLED must be 'enabled' or 'disabled'");
         });
     });
+    describe('getBestNodeForVS', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        getAttribute.mockReset();
+        runLocalCommand.mockReset();
+    });
+
+    it('should return VS_HOST when defined', async () => {
+        getAttribute.mockResolvedValue('192.168.62.213');
+        
+        const result = await vsService.getBestNodeForVS('VS_7_testuser_216');
+        
+        expect(result).toBe('192.168.62.213');
+        expect(getAttribute).toHaveBeenCalledWith('VS_7_testuser_216', 'VS_HOST');
+    });
+
+    it('should call getBestNodeForVS command when VS_HOST is empty', async () => {
+        getAttribute.mockResolvedValue('');
+        runLocalCommand.mockResolvedValue('192.168.62.100');
+        
+        const result = await vsService.getBestNodeForVS('VS_7_testuser_216');
+        
+        expect(result).toBe('192.168.62.100');
+        expect(runLocalCommand).toHaveBeenCalledWith('/ctl/getBestNodeForVS VS_7_testuser_216');
+    });
+
+    it('should return localhost when command returns empty', async () => {
+        getAttribute.mockResolvedValue('');
+        runLocalCommand.mockResolvedValue('');
+        
+        const result = await vsService.getBestNodeForVS('VS_7_testuser_216');
+        
+        expect(result).toBe('localhost');
+    });
+
+    it('should return localhost on error', async () => {
+        getAttribute.mockRejectedValue(new Error('Connection failed'));
+        
+        const result = await vsService.getBestNodeForVS('VS_7_testuser_216');
+        
+        expect(result).toBe('localhost');
+    });
+
+    it('should trim whitespace from command output', async () => {
+        getAttribute.mockResolvedValue('');
+        runLocalCommand.mockResolvedValue('  192.168.62.150  ');
+        
+        const result = await vsService.getBestNodeForVS('VS_7_testuser_216');
+        
+        expect(result).toBe('192.168.62.150');
+    });
+});
+
+describe('createVS', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        
+        // Mock para getVSTDetails
+        getMultipleAttributes.mockResolvedValue({
+            VST_NAME: 'Ubuntu Template',
+            VST_COST: '10',
+            VST_DISABLED: ''
+        });
+        
+        // Mock para getVSDetails do VS criado
+        getMultipleAttributes.mockResolvedValue({
+            VS_NAME: 'New VS from Template',
+            VS_DESC: 'Created from template',
+            VS_STATUS: 'stopped',
+            VST_COST: '10',
+            VS_HOST: '',
+            VS_DTR: '30',
+            VST_NAME: 'Ubuntu Template',
+            VST_DESC: 'Ubuntu description'
+        });
+        
+        // Mock para listFolders (getUserVS)
+        let callCount = 0;
+        runLocalCommand.mockImplementation((command) => {
+            if (command === '/ctl/listFolders testuser') {
+                callCount++;
+                if (callCount === 1) {
+                    return Promise.resolve(''); // Antes: sem VS
+                }
+                return Promise.resolve('VS_7_testuser_217'); // Depois: com VS
+            }
+            if (command === '/ctl/create VST_7_admin_100 testuser') {
+                return Promise.resolve('VS_7_testuser_217');
+            }
+            return Promise.resolve('');
+        });
+    });
+
+    it('should create a new VS from template successfully', async () => {
+        const result = await vsService.createVS('VST_7_admin_100', 'testuser');
+        
+        expect(result.success).toBe(true);
+        expect(result.folderName).toBeDefined();
+        expect(runLocalCommand).toHaveBeenCalledWith('/ctl/create VST_7_admin_100 testuser');
+    });
+
+    it('should throw error when template not found', async () => {
+        getMultipleAttributes.mockRejectedValue(new Error('Template not found'));
+        
+        await expect(vsService.createVS('VST_999_nonexistent', 'testuser'))
+            .rejects.toThrow();
+    });
+
+    it('should throw error when template is disabled', async () => {
+        getMultipleAttributes.mockResolvedValue({
+            VST_NAME: 'Disabled Template',
+            VST_COST: '10',
+            VST_DISABLED: 'YES'
+        });
+        
+        await expect(vsService.createVS('VST_7_admin_100', 'testuser'))
+            .rejects.toThrow('disabled');
+    });
+
+    it('should handle create command failure', async () => {
+        runLocalCommand.mockRejectedValue(new Error('Create command failed'));
+        
+        await expect(vsService.createVS('VST_7_admin_100', 'testuser'))
+            .rejects.toThrow();
+    });
+});
 });

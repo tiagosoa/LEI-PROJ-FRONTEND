@@ -7,7 +7,7 @@ process.env.LDAP_BASE_DN = 'ou=users,dc=test,dc=local';
 process.env.LDAP_USER_ATTR = 'uid';
 
 // Mock do commandExecutor
-jest.mock('../src/utils/commandExecutor', () => ({
+jest.mock('../../src/utils/commandExecutor', () => ({
     runLocalCommand: jest.fn(),
     runRemoteCommand: jest.fn(),
     getAttribute: jest.fn(),
