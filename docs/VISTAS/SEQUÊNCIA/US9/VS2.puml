@@ -1,0 +1,92 @@
+@startuml
+title Vista de Sequência - Nível 2\nEditar Atributos do VS
+
+actor Utilizador as user
+
+participant "UI\n(Angular Components)" as ui
+participant "Serviços de API\n(Angular Services)" as services
+participant "Gestão de Estado\n(Angular State)" as state
+
+participant "Controlador\n(Node.js)" as controller
+participant "Serviço\n(Node.js)" as service
+participant "Autenticação\n(Node.js)" as auth
+participant "Executor de Comandos\n(Node.js)" as executor
+
+participant "Infraestrutura Cloud\n(Scripts / Cluster)" as cloud
+
+user -> ui : Edita campo (inline/textarea/modal)
+activate ui
+
+ui -> services : setAttribute(folderName, attr, value)
+activate services
+
+services -> controller : PUT /api/vs/{id}/attribute (token)
+activate controller
+
+controller -> auth : validarToken()
+activate auth
+auth --> controller : válido
+deactivate auth
+
+controller -> service : setAttribute(folderName, user, attr, value)
+activate service
+
+service -> service : verificar propriedade do VS
+
+service -> service : validar atributo editável
+
+alt Atributo editável
+
+    alt Password (base64)
+
+        service -> service : codificar valor em base64
+        service -> executor : executar setInfo (attr64, base64)
+
+    else Nome/Descrição
+
+        service -> executor : executar setInfo (attr, valor)
+
+    end
+
+    activate executor
+
+    executor -> cloud : ctl/runRemote setInfo
+    activate cloud
+    cloud --> executor : Atributo atualizado
+    deactivate cloud
+
+    executor --> service : resultado
+    deactivate executor
+
+    service --> controller : sucesso
+    deactivate service
+
+    controller --> services : resposta OK
+    deactivate controller
+
+    services -> state : atualizar estado local
+    activate state
+    state --> ui : novo valor
+    deactivate state
+
+    ui --> user : Confirma atualização
+    deactivate services
+    deactivate ui
+
+else Atributo não editável
+
+    service --> controller : erro
+    deactivate service
+
+    controller --> services : erro
+    deactivate controller
+
+    services --> ui : erro
+
+    ui --> user : Mostra erro
+    deactivate services
+    deactivate ui
+
+end
+
+@enduml

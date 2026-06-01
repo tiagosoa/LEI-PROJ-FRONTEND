@@ -1,0 +1,123 @@
+@startuml
+title Vista de Sequência - Nível 3 - Editar Atributos do VS
+
+actor Utilizador
+
+participant "UI Component" as UI
+participant "API Service" as APIService
+participant "Routes" as Routes
+participant "AuthMiddleware" as Middleware
+participant "VSController" as Controller
+participant "VSService" as Service
+participant "AuthService" as AuthService
+participant "ScriptAdapter" as Adapter
+participant "CommandExecutor" as Executor
+participant "OutputParser" as Parser
+participant "Cloud Infrastructure" as Cloud
+
+Utilizador -> UI : Edita nome/descrição/password
+activate UI
+
+alt Edição inline (nome)
+
+    UI -> UI : Ativa modo edição
+    UI -> UI : Usuário edita texto
+    UI -> APIService : saveName(novoNome)
+
+else Textarea (descrição)
+
+    UI -> UI : Abre textarea
+    UI -> UI : Usuário edita descrição
+    UI -> APIService : saveDescription(novaDesc)
+
+else Modal (password)
+
+    UI -> UI : Abre modal
+    UI -> UI : Usuário digita nova password
+    UI -> UI : Confirma password
+    UI -> APIService : saveNewPassword(novaPass)
+
+end
+
+activate APIService
+
+APIService -> Routes : PUT /api/vs/{folderName}/attribute
+activate Routes
+
+Routes -> Middleware : Validar autenticação
+activate Middleware
+
+Middleware -> AuthService : Validar token/sessão
+activate AuthService
+AuthService --> Middleware : OK
+deactivate AuthService
+
+Middleware -> Controller : Encaminhar pedido
+deactivate Middleware
+
+activate Controller
+Controller -> Service : setAttribute(folderName, username, attrName, value)
+activate Service
+
+Service -> Service : getVSDetails(folderName)
+Service -> Service : Validar propriedade (owner === username)
+
+Service -> Service : Validar atributo editável
+
+alt Atributo é VS_NAME ou VS_DESC
+
+    Service -> Service : attrName editável
+
+else Atributo é CUSTOM_ACCESS{N}_PASS
+
+    Service -> Service : attrName editável (custom access)
+    Service -> Service : value = base64 encode
+
+else
+
+    Service -> Service : Erro - atributo não editável
+
+end
+
+Service -> Adapter : setInfo(VS, attrName, value)
+activate Adapter
+
+Adapter -> Executor : getBestNodeForVS(VS)
+activate Executor
+Executor --> Adapter : node IP
+deactivate Executor
+
+Adapter -> Executor : runRemoteCommand(node, VS, setInfo)
+activate Executor
+
+Executor -> Cloud : ctl/runRemote setInfo
+activate Cloud
+Cloud --> Executor : Output do script
+deactivate Cloud
+
+Executor --> Adapter : Resultado bruto
+deactivate Executor
+
+Adapter -> Parser : Interpretar output
+activate Parser
+Parser --> Adapter : Sucesso
+deactivate Parser
+
+Adapter --> Service : Atributo atualizado
+deactivate Adapter
+
+Service --> Controller : Sucesso
+deactivate Service
+
+Controller --> APIService : HTTP 200 + mensagem
+deactivate Controller
+
+APIService --> UI : Resposta JSON (sucesso)
+deactivate APIService
+
+UI -> UI : Atualiza valor exibido
+UI -> UI : Fecha modal/edicao
+UI --> Utilizador : Confirma atualização
+deactivate UI
+
+@enduml

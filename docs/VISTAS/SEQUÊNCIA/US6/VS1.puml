@@ -1,0 +1,46 @@
+@startuml
+title Vista de Sequência - Nível 1\nIniciar VS
+
+actor Utilizador as user
+
+participant "Frontend Web\n(Angular)" as frontend
+participant "Backend API\n(Node.js)" as backend
+participant "Infraestrutura de Cloud Privada\n(Scripts / Cluster)" as cloud
+
+user -> frontend : Solicita início do VS
+activate frontend
+
+frontend -> backend : POST /api/vs/{id}/start\n(token)
+activate backend
+
+backend -> backend : Validar token / sessão
+
+backend -> backend : Verificar propriedade do VS
+
+backend -> backend : Verificar estado atual (deve estar stopped)
+
+alt VS está stopped
+
+    backend -> cloud : Executar ctl/start (VS)
+    activate cloud
+    cloud --> backend : VS iniciado
+    deactivate cloud
+
+    backend --> frontend : Sucesso
+    deactivate backend
+
+    frontend -> frontend : Atualiza estado do VS
+    frontend --> user : VS em execução
+    deactivate frontend
+
+else VS não está stopped
+
+    backend --> frontend : Erro (estado inválido)
+    deactivate backend
+
+    frontend --> user : Apresenta erro
+    deactivate frontend
+
+end
+
+@enduml

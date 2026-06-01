@@ -15,8 +15,7 @@ import { Subscription, interval } from 'rxjs';
         <div class="details-container" *ngIf="!isLoading && vs; else loading">
             <div class="details-header">
                 <div class="title-section">
-                    <h1>{{ vs.name || 'Virtual Server' }}</h1>
-                    <span class="dns-name">DNS: vs{{ vs.id }}</span>
+                    <h1>{{ getDisplayTitle() }}</h1>
                 </div>
                 <div class="action-buttons">
                     <button class="action-btn start" 
@@ -41,63 +40,64 @@ import { Subscription, interval } from 'rxjs';
                     </button>                    
                 </div>
             </div>
-
-            <!-- Status Section -->
-            <div class="info-card">
-                <h3>Status</h3>
-                <div class="status-grid">
-                    <div class="status-item">
-                        <span class="label">Soft Status:</span>
-                        <span class="value" [class.running]="vs.softStatus === 'running'">
-                            {{ vs.softStatus | uppercase }}
-                        </span>
+    
+            <!-- Status & Basic Information Section -->
+            <div class="info-card combined-info">
+                <div class="info-grid-2col">
+                    <!-- Left Column - Status -->
+                    <div class="info-column">
+                        <h3>Status</h3>
+                        <div class="info-item">
+                            <span class="label">Soft Status:</span>
+                            <span class="value status-badge" [class.running]="vs.softStatus === 'running'" [class.stopped]="vs.softStatus !== 'running'">
+                                {{ vs.softStatus | uppercase }}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Hard Status:</span>
+                            <span class="value status-badge" [class.running]="vs.hardStatus === 'running'" [class.stopped]="vs.hardStatus !== 'running'">
+                                {{ vs.hardStatus ? (vs.hardStatus | uppercase) : 'Unknown' }}
+                            </span>
+                        </div>
                     </div>
-                    <div class="status-item">
-                        <span class="label">Hard Status:</span>
-                        <span class="value" [class.running]="vs.hardStatus === 'running'">
-                            {{ vs.hardStatus ? (vs.hardStatus | uppercase) : 'Unknown' }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Basic Info Section -->
-            <div class="info-card">
-                <h3>Basic Information</h3>
-                <div class="info-grid">
-                    <div class="info-row">
-                        <span class="label">Owner:</span>
-                        <span class="value">{{ vs.owner }}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="label">Type:</span>
-                        <span class="value">{{ getTypeDisplay(vs) }}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="label">Cost:</span>
-                        <span class="value" [class.running]="vs.host">
-                            {{ vs.cost }} credits
-                            <span *ngIf="vs.host" class="note">(base: {{ vs.baseCost }}, doubled while running)</span>
-                        </span>
-                    </div>
-                    <div class="info-row">
-                        <span class="label">Days to Run (DTR):</span>
-                        <span class="value" [class.low]="vs.dtr < 5">{{ vs.dtr }} days remaining</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="label">Name:</span>
-                        <span class="value editable-value">
-                            <span *ngIf="!isEditingName">{{ vs.name }}</span>
-                            <input *ngIf="isEditingName" 
-                                   [(ngModel)]="editingNameValue" 
-                                   class="edit-input"
-                                   (keyup.enter)="saveName()"
-                                   (keyup.escape)="cancelEditName()"
-                                   autofocus>
-                            <button *ngIf="!isEditingName" class="edit-icon" (click)="startEditName()" title="Edit name">✏️</button>
-                            <button *ngIf="isEditingName" class="save-icon" (click)="saveName()" [disabled]="isSaving">💾</button>
-                            <button *ngIf="isEditingName" class="cancel-icon" (click)="cancelEditName()">✖️</button>
-                        </span>
+                    
+                    <!-- Right Column - Basic Information -->
+                    <div class="info-column">
+                        <h3>Basic Information</h3>
+                        <div class="info-item">
+                            <span class="label">Owner:</span>
+                            <span class="value">{{ vs.owner }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Type:</span>
+                            <span class="value">{{ getTypeDisplay(vs) }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Cost:</span>
+                            <span class="value" [class.running]="vs.host">
+                                {{ vs.cost }} credits
+                                <span *ngIf="vs.host" class="note">(base: {{ vs.baseCost }}, doubled)</span>
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Days to Run (DTR):</span>
+                            <span class="value" [class.low]="vs.dtr < 5">{{ vs.dtr }} days remaining</span>
+                        </div>
+                        <div class="info-item editable-item">
+                            <span class="label">Name:</span>
+                            <span class="value editable-value">
+                                <span *ngIf="!isEditingName">{{ vs.name }}</span>
+                                <input *ngIf="isEditingName" 
+                                       [(ngModel)]="editingNameValue" 
+                                       class="edit-input"
+                                       (keyup.enter)="saveName()"
+                                       (keyup.escape)="cancelEditName()"
+                                       autofocus>
+                                <button *ngIf="!isEditingName" class="edit-icon" (click)="startEditName()" title="Edit name">✏️</button>
+                                <button *ngIf="isEditingName" class="save-icon" (click)="saveName()" [disabled]="isSaving">💾</button>
+                                <button *ngIf="isEditingName" class="cancel-icon" (click)="cancelEditName()">✖️</button>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -213,10 +213,9 @@ styles: [`
 .details-header{margin-bottom:24px}
 .back-btn{background:0 0;border:none;color:#667eea;cursor:pointer;font-size:14px;margin-bottom:16px;padding:0}
 .back-btn:hover{text-decoration:underline}
-.title-section{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:16px}
-.title-section h1{margin:0;color:#333}
-.dns-name{font-size:.9rem;color:#6c757d;font-family:monospace;background:#f8f9fa;padding:4px 8px;border-radius:4px}
-.action-buttons{display:flex;gap:12px;flex-wrap:wrap}
+.title-section{margin-bottom:20px}
+.title-section h1{margin:0;color:#333;font-size:1.8rem}
+.action-buttons{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
 .action-btn{padding:8px 20px;border:none;border-radius:4px;cursor:pointer;font-weight:500;transition:all .2s}
 .action-btn.start{background:#28a745;color:#fff}
 .action-btn.start:hover:not(:disabled){background:#218838}
@@ -227,75 +226,84 @@ styles: [`
 .action-btn.reset-dtr{background:#17a2b8;color:#fff}
 .action-btn.reset-dtr:hover:not(:disabled){background:#138496}
 .action-btn:disabled{opacity:.5;cursor:not-allowed}
-.info-card{background:#fff;border-radius:8px;border:1px solid #333;padding:20px;margin-bottom:20px}
-.info-card h3{margin:0 0 16px;color:#333;border-bottom:2px solid #667eea;padding-bottom:8px}
-.status-grid,.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
-.status-item,.info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #333}
-.status-item:last-child,.info-row:last-child{border-bottom:none}
-.label{font-weight:500;color:#666}
-.value{color:#333}
+.info-card{background:#fff;border-radius:12px;border:1px solid #838383;padding:24px;margin-bottom:24px;box-shadow:0 2px 4px rgba(0,0,0,0.05)}
+.info-card h3{margin:0 0 20px;color:#2c3e50;border-left:4px solid #4a90e2;padding-left:12px;font-size:1.1rem}
+.info-grid-2col{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+.info-column{}
+.info-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e9ecef}
+.info-item:last-child{border-bottom:none}
+.editable-item{padding-top:8px}
+.label{font-weight:600;color:#555;font-size:0.85rem}
+.value{color:#333;font-size:0.95rem}
 .value.running{color:#28a745;font-weight:700}
 .value.low{color:#dc3545;font-weight:700}
-.note{font-size:.8rem;color:#666;margin-left:8px}
+.note{font-size:.7rem;color:#888;margin-left:8px}
+.status-badge{padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600}
+.status-badge.running{background:#d4edda;color:#155724}
+.status-badge.stopped{background:#e2e3e5;color:#383d41}
 .access-list{display:flex;flex-direction:column;gap:20px}
-.access-item{border:1px solid #333;border-radius:8px;padding:16px}
-.access-header{display:flex;justify-content:flex-end;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #333}
+.access-item{border:1px solid #838383;border-radius:10px;padding:16px;transition:box-shadow 0.2s}
+.access-item:hover{box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.access-header{display:flex;justify-content:flex-end;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #838383}
 .access-controls{display:flex;align-items:center;gap:12px}
 .access-status{padding:4px 12px;border-radius:20px;font-size:.7rem;font-weight:600;text-transform:uppercase}
-.access-status.enabled{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
-.access-status.disabled{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+.access-status.enabled{background:#d4edda;color:#155724}
+.access-status.disabled{background:#f8d7da;color:#721c24}
 .toggle-btn{padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-size:.75rem;font-weight:500}
 .toggle-btn.enabled{background:#dc3545;color:#fff}
 .toggle-btn.enabled:hover:not(:disabled){background:#c82333}
 .toggle-btn.disabled{background:#28a745;color:#fff}
 .toggle-btn.disabled:hover:not(:disabled){background:#218838}
 .toggle-btn:disabled{opacity:.6;cursor:not-allowed}
-.access-description{color:#555;margin-bottom:12px;font-size:.9rem}
-.access-description ::ng-deep a{color:#667eea;text-decoration:none}
+.access-description{color:#555;margin-bottom:12px;font-size:.9rem;line-height:1.5}
+.access-description ::ng-deep a{color:#4a90e2;text-decoration:none}
 .access-description ::ng-deep a:hover{text-decoration:underline}
-.password-field{display:flex;gap:8px;align-items:center;margin-top:8px;padding:8px;border:1px solid #333;border-radius:4px;background:#f9f9f9}
-.password-field input{flex:1;padding:6px 10px;border:1px solid #444;border-radius:4px;background:#f8f9fa;font-family:monospace}
-.password-field button{padding:6px 12px;background:#667eea;color:#fff;border:none;border-radius:4px;cursor:pointer}
-.password-field button:hover{background:#5a67d8}
-.change-pass-btn{margin-top:12px;padding:6px 12px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer}
+.password-field{display:flex;gap:8px;align-items:center;margin-top:12px;padding:8px 12px;border:1px solid #838383;border-radius:8px;background:#f9f9f9}
+.password-field input{flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;font-family:monospace}
+.password-field button{padding:6px 12px;background:#4a90e2;color:#fff;border:none;border-radius:4px;cursor:pointer;transition:background 0.2s}
+.password-field button:hover{background:#357abd}
+.change-pass-btn{margin-top:12px;padding:6px 16px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;transition:background 0.2s}
 .change-pass-btn:hover{background:#5a6268}
-.description-container{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-.description-column{border:1px solid #333;border-radius:8px;overflow:hidden}
-.description-header{background:#f8f9fa;padding:12px 16px;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center}
-.edit-icon-small{background:0 0;border:none;cursor:pointer;color:#667eea;font-size:12px}
+.description-container{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.description-column{border:1px solid #838383;border-radius:10px;overflow:hidden}
+.description-header{background:#f8f9fa;padding:14px 18px;border-bottom:1px solid #838383;display:flex;justify-content:space-between;align-items:center}
+.description-header strong{color:#2c3e50}
+.edit-icon-small{background:0 0;border:none;cursor:pointer;color:#4a90e2;font-size:12px;font-weight:500}
 .edit-icon-small:hover{text-decoration:underline}
-.description-content{padding:16px;line-height:1.6;white-space:pre-wrap;min-height:150px}
+.description-content{padding:18px;line-height:1.6;white-space:pre-wrap;min-height:150px;color:#444}
 .description-content.read-only{background:#fafafa;color:#666}
-.description-edit{padding:16px}
-.edit-textarea{width:100%;padding:8px;border:1px solid #333;border-radius:4px;font-family:monospace;font-size:13px;resize:vertical}
-.edit-actions{margin-top:12px;display:flex;gap:8px}
-.editable-value{display:flex;align-items:center;gap:8px}
-.edit-input{padding:6px 10px;border:1px solid #333;border-radius:4px;font-size:14px;width:200px}
-.edit-icon,.save-icon,.cancel-icon{background:0 0;border:none;cursor:pointer;font-size:16px;padding:0 4px}
-.edit-icon:hover{opacity:.7}
+.description-edit{padding:18px}
+.edit-textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-family:monospace;font-size:13px;resize:vertical}
+.edit-actions{margin-top:12px;display:flex;gap:10px}
+.editable-value{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.edit-input{padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;width:250px}
+.edit-icon,.save-icon,.cancel-icon{background:0 0;border:none;cursor:pointer;font-size:16px;padding:4px;border-radius:4px}
+.edit-icon:hover{background:#f0f0f0}
 .save-icon{color:#28a745}
+.save-icon:hover{background:#e8f5e9}
 .cancel-icon{color:#dc3545}
-.save-btn{background:#28a745;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer}
+.cancel-icon:hover{background:#ffebee}
+.save-btn{background:#28a745;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:500}
 .save-btn:hover:not(:disabled){background:#218838}
 .save-btn:disabled{opacity:.6;cursor:not-allowed}
-.cancel-btn{background:#6c757d;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer}
+.cancel-btn{background:#6c757d;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-weight:500}
 .cancel-btn:hover{background:#5a6268}
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal-content{background:#fff;border-radius:12px;max-width:450px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,.3)}
-.modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #e9ecef;background:#2c3e50;color:#fff;border-radius:12px 12px 0 0}
+.modal-content{background:#fff;border-radius:16px;max-width:450px;width:90%;box-shadow:0 20px 40px rgba(0,0,0,.3)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid #e9ecef;background:#2c3e50;color:#fff;border-radius:16px 16px 0 0}
 .modal-header h3{margin:0;font-size:1.1rem}
 .modal-close{background:0 0;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;padding:0;margin:0}
 .modal-close:hover{opacity:.8}
-.modal-body{padding:20px}
-.modal-body label{display:block;margin-bottom:5px;color:#555;font-weight:500}
-.password-input-modal{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;box-sizing:border-box}
-.password-input-modal:focus{outline:none;border-color:#667eea}
-.modal-footer{padding:16px 20px;border-top:1px solid #e9ecef;text-align:right;background:#f8f9fa;border-radius:0 0 12px 12px;display:flex;gap:10px;justify-content:flex-end}
-.loading{text-align:center;padding:50px}
-.spinner{border:3px solid #f3f3f3;border-top:3px solid #6c757d;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 20px}
+.modal-body{padding:24px}
+.modal-body label{display:block;margin-bottom:6px;color:#555;font-weight:500}
+.password-input-modal{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box}
+.password-input-modal:focus{outline:none;border-color:#4a90e2;box-shadow:0 0 0 3px rgba(74,144,226,0.1)}
+.modal-footer{padding:16px 24px;border-top:1px solid #e9ecef;text-align:right;background:#f8f9fa;border-radius:0 0 16px 16px;display:flex;gap:10px;justify-content:flex-end}
+.loading{text-align:center;padding:60px}
+.spinner{border:3px solid #f3f3f3;border-top:3px solid #4a90e2;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 20px}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-@media (max-width:768px){.details-container{padding:16px}.network-header,.network-row{grid-template-columns:80px 1fr;gap:8px}.network-header span:nth-child(3),.network-header span:nth-child(4),.network-row span:nth-child(3),.network-row span:nth-child(4){display:none}.status-grid,.info-grid{grid-template-columns:1fr}.action-buttons{justify-content:center}}
-    `]
+@media (max-width:768px){.details-container{padding:16px}.info-grid-2col{grid-template-columns:1fr;gap:24px}.description-container{grid-template-columns:1fr;gap:16px}.action-buttons{justify-content:center}}
+`]
 })
 
 export class VSDetailsComponent implements OnInit {
@@ -848,4 +856,9 @@ export class VSDetailsComponent implements OnInit {
             this.pollingSubscription = null;
         }
     }
+
+    getDisplayTitle(): string {
+        if (!this.vs) return 'Virtual Server';
+        return `vs${this.vs.id} - ${this.vs.name || 'Virtual Server'}`;
+    }  
 }

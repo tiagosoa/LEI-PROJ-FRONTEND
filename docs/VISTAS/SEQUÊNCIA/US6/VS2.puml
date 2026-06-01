@@ -1,0 +1,82 @@
+@startuml
+title Vista de Sequência - Nível 2\nIniciar VS
+
+actor Utilizador as user
+
+participant "UI\n(Angular Components)" as ui
+participant "Serviços de API\n(Angular Services)" as services
+participant "Gestão de Estado\n(Angular State)" as state
+
+participant "Controlador\n(Node.js)" as controller
+participant "Serviço\n(Node.js)" as service
+participant "Autenticação\n(Node.js)" as auth
+participant "Executor de Comandos\n(Node.js)" as executor
+
+participant "Infraestrutura Cloud\n(Scripts / Cluster)" as cloud
+
+user -> ui : Clica em "Start"
+activate ui
+
+ui -> services : startVS(folderName)
+activate services
+
+services -> controller : POST /api/vs/{id}/start (token)
+activate controller
+
+controller -> auth : validarToken()
+activate auth
+auth --> controller : válido
+deactivate auth
+
+controller -> service : iniciarVS(folderName, user)
+activate service
+
+service -> service : verificar propriedade do VS
+
+service -> service : verificar estado (softStatus === 'stopped')
+
+alt VS está stopped
+
+    service -> executor : executar start(VS)
+    activate executor
+
+    executor -> cloud : ctl/start
+    activate cloud
+    cloud --> executor : VS iniciado
+    deactivate cloud
+
+    executor --> service : resultado
+    deactivate executor
+
+    service --> controller : sucesso
+    deactivate service
+
+    controller --> services : resposta OK
+    deactivate controller
+
+    services -> state : atualizar estado do VS
+    activate state
+    state --> ui : novo estado (running)
+    deactivate state
+
+    ui --> user : VS em execução
+    deactivate services
+    deactivate ui
+
+else VS não está stopped
+
+    service --> controller : erro (estado inválido)
+    deactivate service
+
+    controller --> services : erro
+    deactivate controller
+
+    services --> ui : erro
+
+    ui --> user : Mostra erro
+    deactivate services
+    deactivate ui
+
+end
+
+@enduml

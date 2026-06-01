@@ -1,0 +1,48 @@
+@startuml
+title Vista de Sequência - Nível 1\nEditar Atributos do VS
+
+actor Utilizador as user
+
+participant "Frontend Web\n(Angular)" as frontend
+participant "Backend API\n(Node.js)" as backend
+participant "Infraestrutura de Cloud Privada\n(Scripts / Cluster)" as cloud
+
+user -> frontend : Edita atributo (nome/descrição/password)
+activate frontend
+
+frontend -> frontend : Valida input
+
+frontend -> backend : PUT /api/vs/{id}/attribute\n(atributo, valor, token)
+activate backend
+
+backend -> backend : Validar token / sessão
+
+backend -> backend : Verificar propriedade do VS
+
+backend -> backend : Validar atributo editável
+
+alt Atributo válido
+
+    backend -> cloud : Executar ctl/setInfo (atributo, valor)
+    activate cloud
+    cloud --> backend : Atributo atualizado
+    deactivate cloud
+
+    backend --> frontend : Sucesso
+    deactivate backend
+
+    frontend -> frontend : Atualiza UI com novo valor
+    frontend --> user : Confirmação
+    deactivate frontend
+
+else Atributo inválido
+
+    backend --> frontend : Erro (atributo não editável)
+    deactivate backend
+
+    frontend --> user : Apresenta erro
+    deactivate frontend
+
+end
+
+@enduml

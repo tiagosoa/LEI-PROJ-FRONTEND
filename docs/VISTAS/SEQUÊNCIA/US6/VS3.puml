@@ -1,0 +1,104 @@
+@startuml
+title Vista de Sequência - Nível 3 - Iniciar VS
+
+actor Utilizador
+
+participant "UI Component" as UI
+participant "API Service" as APIService
+participant "Routes" as Routes
+participant "AuthMiddleware" as Middleware
+participant "VSController" as Controller
+participant "VSService" as Service
+participant "AuthService" as AuthService
+participant "ScriptAdapter" as Adapter
+participant "CommandExecutor" as Executor
+participant "OutputParser" as Parser
+participant "Cloud Infrastructure" as Cloud
+
+Utilizador -> UI : Clica no botão Start
+activate UI
+
+UI -> APIService : POST /vs/{folderName}/start
+activate APIService
+
+APIService -> Routes : HTTP Request
+activate Routes
+
+Routes -> Middleware : Validar autenticação
+activate Middleware
+
+Middleware -> AuthService : Validar token/sessão
+activate AuthService
+AuthService --> Middleware : OK
+deactivate AuthService
+
+Middleware -> Controller : Encaminhar pedido
+deactivate Middleware
+
+activate Controller
+Controller -> Service : startVS(folderName, username)
+activate Service
+
+Service -> Service : getVSDetails(folderName)
+Service -> Service : Validar propriedade (owner === username)
+Service -> Service : Validar estado (softStatus === 'stopped')
+
+alt Estado válido (stopped)
+
+    Service -> Adapter : start(VS)
+    activate Adapter
+
+    Adapter -> Executor : getBestNodeForVS(VS)
+    activate Executor
+    Executor --> Adapter : node IP
+    deactivate Executor
+
+    Adapter -> Executor : runRemoteCommand(node, VS, start)
+    activate Executor
+
+    Executor -> Cloud : ctl/runRemote start
+    activate Cloud
+    Cloud --> Executor : Output do script
+    deactivate Cloud
+
+    Executor --> Adapter : Resultado bruto
+    deactivate Executor
+
+    Adapter -> Parser : Interpretar output
+    activate Parser
+    Parser --> Adapter : Sucesso
+    deactivate Parser
+
+    Adapter --> Service : Resultado final
+    deactivate Adapter
+
+    Service -> Service : Atualizar estado local
+    Service --> Controller : Sucesso (VS iniciado)
+    deactivate Service
+
+    Controller --> APIService : HTTP 200 + dados
+    deactivate Controller
+
+    APIService --> UI : Resposta JSON (sucesso)
+    deactivate APIService
+
+    UI --> Utilizador : Atualiza interface (VS running)
+    deactivate UI
+
+else Estado inválido (running/starting)
+
+    Service --> Controller : Erro (estado inválido)
+    deactivate Service
+
+    Controller --> APIService : HTTP 400 + erro
+    deactivate Controller
+
+    APIService --> UI : Erro
+    deactivate APIService
+
+    UI --> Utilizador : Mostra mensagem de erro
+    deactivate UI
+
+end
+
+@enduml
