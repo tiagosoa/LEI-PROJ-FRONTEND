@@ -103,7 +103,7 @@ import { Subscription, interval } from 'rxjs';
             </div>
 
             <!-- Custom Access Section -->
-            <div class="info-card" *ngIf="vs.customAccesses && vs.customAccesses.length > 0">
+            <div class="info-card" *ngIf="vs.customAccesses && vs.customAccesses.length > 0 && vs.softStatus === 'running'">
                 <h3>Access Methods</h3>
                 <div class="access-list">
                     <div class="access-item" *ngFor="let access of vs.customAccesses">
@@ -140,6 +140,16 @@ import { Subscription, interval } from 'rxjs';
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="info-card" *ngIf="vs.customAccesses && vs.customAccesses.length > 0 && vs.softStatus !== 'running'">
+                <h3>Access Methods</h3>
+                <div class="access-placeholder">
+                    <p class="placeholder-message">
+                        Access methods are only available when the Virtual Server is running.
+                    </p>
+                    <p class="placeholder-hint">Start the VS to view SSH, VNC, and other access methods.</p>
                 </div>
             </div>
 
@@ -249,6 +259,9 @@ styles: [`
 .access-status{padding:4px 12px;border-radius:20px;font-size:.7rem;font-weight:600;text-transform:uppercase}
 .access-status.enabled{background:#d4edda;color:#155724}
 .access-status.disabled{background:#f8d7da;color:#721c24}
+.access-placeholder{text-align:center;padding:30px 20px;background:#f8f9fa;border-radius:8px;color:#666}
+.placeholder-message{font-size:0.95rem;margin-bottom:8px}
+.placeholder-hint{font-size:0.8rem;color:#888;}
 .toggle-btn{padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-size:.75rem;font-weight:500}
 .toggle-btn.enabled{background:#dc3545;color:#fff}
 .toggle-btn.enabled:hover:not(:disabled){background:#c82333}
@@ -329,6 +342,8 @@ export class VSDetailsComponent implements OnInit {
     confirmPassword: string = '';
     isTogglingAccess: { [key: number]: boolean } = {}; 
     isResettingDTR: boolean = false; 
+    private isComponentActive: boolean = true;
+    private hasShownNotFound: boolean = false;
     private pollingSubscription: Subscription | null = null;
     private readonly POLLING_INTERVAL = 5000; 
     
@@ -342,9 +357,23 @@ export class VSDetailsComponent implements OnInit {
     
     ngOnInit(): void {
         console.log('VSDetailsComponent initialized');
+        this.isComponentActive = true;
+        this.hasShownNotFound = false;
+
         this.route.params.subscribe(params => {
+            if (!this.isComponentActive) return;
+
             const folderName = params['folderName'];
             console.log('Folder name from route:', folderName);
+            
+            if (!folderName || !folderName.match(/^(VS|VST)_\d+_\w+_\d+$/)) {
+                console.error('Invalid folder name format:', folderName);
+                this.errorMessage = 'Invalid virtual server identifier';
+                this.isLoading = false;
+                this.cdr.detectChanges();
+                return;
+            }
+
             if (folderName) {
                 this.loadVSDetails(folderName);
                 this.startPolling();
@@ -358,10 +387,12 @@ export class VSDetailsComponent implements OnInit {
     }
 
     ngOnDestroy(): void {
+        this.isComponentActive = false;
         this.stopPolling();
     }
     
     loadVSDetails(folderName: string, showLoading: boolean = true): void {
+        if (!this.isComponentActive) return;
         if (showLoading) {
             this.isLoading = true;
             this.cdr.detectChanges();
@@ -376,8 +407,17 @@ export class VSDetailsComponent implements OnInit {
                 this.cdr.detectChanges();
             },
             error: (error) => {
+                if (!this.isComponentActive) return;
+                
                 console.error('Error loading VS details:', error);
-                this.handleNotFound();
+                
+                if (error.status === 404 || error.status === 500) {
+                    this.handleNotFound();
+                } else {
+                    this.errorMessage = 'Failed to load virtual server details. Please try again.';
+                    this.isLoading = false;
+                    this.cdr.detectChanges();
+                }
             }
         });
     }
@@ -406,6 +446,8 @@ export class VSDetailsComponent implements OnInit {
     }
 
     private handleNotFound(): void {
+        if (this.hasShownNotFound) return;
+        this.hasShownNotFound = true;
         alert('Virtual server not found or has been deleted.');
         this.router.navigate(['/vs']);
     }

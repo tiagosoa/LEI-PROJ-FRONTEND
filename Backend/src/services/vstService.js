@@ -132,7 +132,7 @@ async function getVSTDetails(vstFolder) {
         cost: parseInt(attrValues.VST_COST) || 0,
         disabled: isDisabled,
         softStatus: attrValues.VS_STATUS?.toLowerCase() || 'stopped',
-        typeDescription: formattedTypeDescription,  // Agora formato: "7 - LXC"
+        typeDescription: formattedTypeDescription,
         requisites: requisites,
         fixedHost: attrValues.VS_FIXED_HOST || null,
         folderName: vstFolder

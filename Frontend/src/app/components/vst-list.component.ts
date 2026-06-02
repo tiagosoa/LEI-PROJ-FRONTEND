@@ -50,11 +50,15 @@ import { Subscription, interval } from 'rxjs';
                     </div>
                     
                     <div class="vst-card-footer">
-                        <button class="description-btn" (click)="openDescriptionModal(vst)" [disabled]="isLoading">
+                        <button class="description-btn" 
+                                (click)="openDescriptionModal(vst)" 
+                                [disabled]="isCreatingForVST[vst.folderName] || isAnyCreationInProgress">
                             View Description
                         </button>
-                        <button class="create-btn" (click)="createVS(vst)" [disabled]="creatingVS">
-                            {{ creatingVS ? 'Creating...' : 'Create Virtual Server from this template' }}
+                        <button class="create-btn" 
+                                (click)="createVS(vst)" 
+                                [disabled]="isCreatingForVST[vst.folderName] || isAnyCreationInProgress">
+                            {{ isCreatingForVST[vst.folderName] ? 'Creating...' : 'Create Virtual Server from this template' }}
                         </button>
                     </div>
                 </div>
@@ -266,8 +270,7 @@ import { Subscription, interval } from 'rxjs';
         .create-btn:hover {
             background: #218838;
         }
-        
-        /* Modal Styles */
+
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -396,7 +399,8 @@ export class VSTListComponent implements OnInit {
     vstList: VirtualServerTemplate[] = [];
     isLoading = true;
     selectedVST: VirtualServerTemplate | null = null;
-    creatingVS: boolean = false;
+    isCreatingForVST: { [key: string]: boolean } = {};
+    isAnyCreationInProgress: boolean = false;
     private pollingSubscription: Subscription | null = null;
     private readonly POLLING_INTERVAL = 30000;
     
@@ -454,8 +458,14 @@ export class VSTListComponent implements OnInit {
 
 
     createVS(vst: VirtualServerTemplate): void {
+        if (this.isAnyCreationInProgress) {
+            alert('A virtual server is already being created. Please wait for it to complete.');
+            return;
+        }
+
         if (confirm(`Create a new virtual server from template "${vst.name}"?`)) {
-            this.creatingVS = true;
+            this.isAnyCreationInProgress = true;
+            this.isCreatingForVST[vst.folderName] = true;
             this.cdr.detectChanges();
             
             this.vsService.createVS(vst.folderName).subscribe({
@@ -465,7 +475,8 @@ export class VSTListComponent implements OnInit {
                         this.creditService.refreshCredit();
                         this.router.navigate(['/vs']);
                     }
-                    this.creatingVS = false;
+                    this.isCreatingForVST[vst.folderName] = false
+                    this.isAnyCreationInProgress = false;
                     this.cdr.detectChanges();
                 },
                 error: (error) => {
@@ -476,7 +487,8 @@ export class VSTListComponent implements OnInit {
                     } else {
                         alert(`Failed to create virtual server: ${error.error?.error || 'Unknown error'}`);
                     }
-                    this.creatingVS = false;
+                    this.isCreatingForVST[vst.folderName] = false;
+                    this.isAnyCreationInProgress = false;
                     this.cdr.detectChanges();
                 }
             });
