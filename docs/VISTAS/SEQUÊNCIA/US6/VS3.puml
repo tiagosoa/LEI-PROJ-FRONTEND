@@ -10,9 +10,7 @@ participant "AuthMiddleware" as Middleware
 participant "VSController" as Controller
 participant "VSService" as Service
 participant "AuthService" as AuthService
-participant "ScriptAdapter" as Adapter
 participant "CommandExecutor" as Executor
-participant "OutputParser" as Parser
 participant "Cloud Infrastructure" as Cloud
 
 Utilizador -> UI : Clica no botão Start
@@ -45,15 +43,12 @@ Service -> Service : Validar estado (softStatus === 'stopped')
 
 alt Estado válido (stopped)
 
-    Service -> Adapter : start(VS)
-    activate Adapter
-
-    Adapter -> Executor : getBestNodeForVS(VS)
+    Service -> Executor : getBestNodeForVS(VS)
     activate Executor
-    Executor --> Adapter : node IP
+    Executor --> Service : node IP
     deactivate Executor
 
-    Adapter -> Executor : runRemoteCommand(node, VS, start)
+    Service -> Executor : runRemoteCommand(node, VS, start)
     activate Executor
 
     Executor -> Cloud : ctl/runRemote start
@@ -61,16 +56,10 @@ alt Estado válido (stopped)
     Cloud --> Executor : Output do script
     deactivate Cloud
 
-    Executor --> Adapter : Resultado bruto
+    Executor --> Service : Resultado bruto
     deactivate Executor
 
-    Adapter -> Parser : Interpretar output
-    activate Parser
-    Parser --> Adapter : Sucesso
-    deactivate Parser
-
-    Adapter --> Service : Resultado final
-    deactivate Adapter
+    Service -> Service : Interpretar output
 
     Service -> Service : Atualizar estado local
     Service --> Controller : Sucesso (VS iniciado)

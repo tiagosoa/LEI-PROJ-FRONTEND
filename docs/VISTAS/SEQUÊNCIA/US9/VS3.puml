@@ -10,9 +10,7 @@ participant "AuthMiddleware" as Middleware
 participant "VSController" as Controller
 participant "VSService" as Service
 participant "AuthService" as AuthService
-participant "ScriptAdapter" as Adapter
 participant "CommandExecutor" as Executor
-participant "OutputParser" as Parser
 participant "Cloud Infrastructure" as Cloud
 
 Utilizador -> UI : Edita nome/descrição/password
@@ -79,15 +77,12 @@ else
 
 end
 
-Service -> Adapter : setInfo(VS, attrName, value)
-activate Adapter
-
-Adapter -> Executor : getBestNodeForVS(VS)
+Service -> Executor : getBestNodeForVS(VS)
 activate Executor
-Executor --> Adapter : node IP
+Executor --> Service : node IP
 deactivate Executor
 
-Adapter -> Executor : runRemoteCommand(node, VS, setInfo)
+Service -> Executor : runRemoteCommand(node, VS, setInfo)
 activate Executor
 
 Executor -> Cloud : ctl/runRemote setInfo
@@ -95,16 +90,13 @@ activate Cloud
 Cloud --> Executor : Output do script
 deactivate Cloud
 
-Executor --> Adapter : Resultado bruto
+Executor --> Service : Resultado bruto
 deactivate Executor
 
-Adapter -> Parser : Interpretar output
-activate Parser
-Parser --> Adapter : Sucesso
-deactivate Parser
+Service -> Service : Interpretar output
 
-Adapter --> Service : Atributo atualizado
-deactivate Adapter
+Service --> Service : Atributo atualizado
+
 
 Service --> Controller : Sucesso
 deactivate Service

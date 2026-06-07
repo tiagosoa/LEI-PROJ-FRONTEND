@@ -17,10 +17,6 @@ Container(api, "API Backend (Node.js)") {
 
     Component(commandExecutor, "Command Executor", "Node.js", "Executa comandos no sistema operativo")
 
-    Component(scriptAdapter, "Script Adapter", "Node.js", "Encapsula chamadas aos scripts (ctl/*)")
-
-    Component(outputParser, "Output Parser", "Node.js", "Interpreta outputs dos scripts e converte para JSON")
-
 }
 
 System_Ext(ldap, "Servidor LDAP", "Autenticação institucional")
@@ -36,13 +32,9 @@ Rel(vsService, creditService, "Verifica crédito")
 
 Rel(vsService, authService, "Valida utilizador")
 
-Rel(vsService, scriptAdapter, "Executa operações")
-
-Rel(scriptAdapter, commandExecutor, "Executa comandos")
+Rel(vsService, commandExecutor, "Executa comandos")
 
 Rel(commandExecutor, cloud, "Invoca scripts (ctl/*)")
-
-Rel(scriptAdapter, outputParser, "Processa resultados")
 
 Rel(authService, ldap, "Autentica", "LDAP")
 

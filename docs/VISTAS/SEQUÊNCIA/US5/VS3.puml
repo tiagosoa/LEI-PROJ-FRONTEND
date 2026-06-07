@@ -11,9 +11,7 @@ participant "VSController" as Controller
 participant "VSService" as Service
 participant "AuthService" as AuthService
 participant "CreditService" as CreditService
-participant "ScriptAdapter" as Adapter
 participant "CommandExecutor" as Executor
-participant "OutputParser" as Parser
 participant "Cloud Infrastructure" as Cloud
 
 Utilizador -> UI : Seleciona VST e cria VS
@@ -47,10 +45,7 @@ activate CreditService
 CreditService --> Service : Crédito suficiente
 deactivate CreditService
 
-Service -> Adapter : create(VST, user)
-activate Adapter
-
-Adapter -> Executor : Executar comando ctl/create
+Service -> Executor : create(VST, user)
 activate Executor
 
 Executor -> Cloud : Invoca script create
@@ -58,16 +53,10 @@ activate Cloud
 Cloud --> Executor : Output do script
 deactivate Cloud
 
-Executor --> Adapter : Resultado bruto
+Executor --> Service : Resultado bruto
 deactivate Executor
 
-Adapter -> Parser : Interpretar output
-activate Parser
-Parser --> Adapter : Dados estruturados (VS criado)
-deactivate Parser
-
-Adapter --> Service : Resultado final
-deactivate Adapter
+Service -> Service : Interpretar output
 
 Service --> Controller : VS criado com sucesso
 deactivate Service

@@ -19,10 +19,6 @@ Container_Boundary(api, "API Backend (Node.js)") {
 
     Component(commandExecutor, "commandExecutor.js", "JavaScript", "Execução de comandos no sistema")
 
-    Component(scriptAdapter, "scriptAdapter.js", "JavaScript", "Encapsula chamadas aos scripts ctl/*")
-
-    Component(outputParser, "outputParser.js", "JavaScript", "Conversão de output de scripts para JSON")
-
     Component(middleware, "AuthMiddleware.js", "JavaScript", "Validação de autenticação nos pedidos")
 
 }
@@ -41,13 +37,11 @@ Rel(authController, authService, "Invoca")
 Rel(vsService, creditService, "Verifica crédito")
 Rel(vsService, authService, "Valida utilizador")
 
-Rel(vsService, scriptAdapter, "Executa operações")
+Rel(vsService, commandExecutor, "Executa comandos")
 
-Rel(scriptAdapter, commandExecutor, "Executa comandos")
 Rel(commandExecutor, cloud, "Invoca scripts ctl/*")
 
-Rel(scriptAdapter, outputParser, "Processa output")
-Rel(outputParser, vsService, "Retorna dados")
+Rel(commandExecutor, vsService, "Retorna dados")
 
 Rel(authService, ldap, "Autentica", "LDAP")
 
